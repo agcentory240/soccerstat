@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { Outlet, useOutletContext } from 'react-router-dom'
 import { useMatchesStore } from '../../store/useMatchesStore'
 import { MatchList } from '../../components/MatchList'
-import type { LayoutContext } from '../../components/Layout/Layout'
+import { Outlet } from 'react-router-dom'
 
 export function MatchesPage() {
   const matches = useMatchesStore((s) => s.matches)
@@ -10,7 +9,6 @@ export function MatchesPage() {
   const error = useMatchesStore((s) => s.error)
   const loadMatches = useMatchesStore((s) => s.loadMatches)
   const connectEvents = useMatchesStore((s) => s.connectEvents)
-  const { asideVisible } = useOutletContext<LayoutContext>()
 
   useEffect(() => {
     loadMatches()
@@ -20,12 +18,10 @@ export function MatchesPage() {
 
   return (
     <div className="flex h-full">
-      {asideVisible && (
-        <aside className="w-1/4 shrink-0 overflow-hidden border-r border-slate-800">
-          <MatchList matches={matches} loading={loading} error={error} />
-        </aside>
-      )}
-      <section className="min-w-0 flex-1 overflow-y-auto">
+      <aside className="w-1/4 ...">
+        <MatchList matches={matches} loading={loading} error={error} />
+      </aside>
+      <section className="w-3/4 overflow-y-auto">
         <Outlet />
       </section>
     </div>

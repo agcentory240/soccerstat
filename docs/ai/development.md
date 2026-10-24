@@ -19,11 +19,21 @@ npm install
 
 ## 3. Окружение
 
+API загружает `.env` автоматически — вручную экспортировать переменные не нужно.
+
 ```bash
-cp .env.example .env
+cp .env.example .env          # общий файл проекта (адреса Docker-сервисов)
+cp app/.env.example app/.env  # локальный override для запуска без Docker
 ```
 
-Заполни минимум `AI_API_KEY`. `.env` исключён из git.
+Заполни минимум `AI_API_KEY`. Оба файла (`.env` и `app/.env`) исключены из git.
+
+Порядок загрузки задаёт [`app/src/env.ts`](../app/src/env.ts):
+
+1. `app/.env` — локальные переопределения (приоритет выше);
+2. `<корень репозитория>/.env` — общий файл.
+
+Уже заданные переменные окружения процесса (например, из `docker-compose.yml`) не перезаписываются. Загрузчик подключается первым импортом в [`app/src/main.ts`](../app/src/main.ts) и [`app/src/data-source.ts`](../app/src/data-source.ts), поэтому `ai.config.ts` и `state.config.ts` видят значения на этапе импорта.
 
 Варианты запуска:
 
@@ -34,11 +44,11 @@ cp .env.example .env
 npm run dev
 
 # отдельно
-DB_HOST=localhost npm run dev:api
+npm run dev:api
 npm run dev:web
 ```
 
-Для локального API нужны PostgreSQL, RabbitMQ и Redis (можно поднять только их через `docker compose up -d postgres rabbitmq redis`). Без `DB_HOST=localhost` API попытается подключиться к хосту `postgres`, а без `REDIS_URL` — к `redis://localhost:6379`. Redis не обязателен для запуска: без него API работает, но состояние операций не транслируется на фронтенд.
+Для локального API нужны PostgreSQL, RabbitMQ и Redis (можно поднять только их через `docker compose up -d postgres rabbitmq redis`). В `app/.env` должны быть адреса `localhost` (`DB_HOST=localhost`, `RABBITMQ_URI=…@localhost:5672`, `REDIS_URL=redis://localhost:6379`) — в корневом `.env` указаны имена Docker-сервисов. Redis не обязателен для запуска: без него API работает, но состояние операций не транслируется на фронтенд.
 
 ### B. Docker Compose
 

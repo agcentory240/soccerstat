@@ -17,8 +17,8 @@ const SERVICE_ITEMS = [
 ];
 
 interface TopMenuProps {
-  asideVisible: boolean;
-  onToggleAside: () => void;
+  logPanelVisible: boolean;
+  onToggleLogPanel: () => void;
 }
 
 function describeState(state: ServerStateEvent | null, connected: boolean) {
@@ -44,7 +44,7 @@ function describeState(state: ServerStateEvent | null, connected: boolean) {
   }
 }
 
-export function TopMenu({ asideVisible, onToggleAside }: TopMenuProps) {
+export function TopMenu({ logPanelVisible, onToggleLogPanel }: TopMenuProps) {
 
   const refreshing = useMatchesStore((s) => s.refreshing)
   const refreshAll = useMatchesStore((s) => s.refreshAll)
@@ -171,10 +171,10 @@ export function TopMenu({ asideVisible, onToggleAside }: TopMenuProps) {
 
       <button
         type="button"
-        onClick={onToggleAside}
-        aria-label={asideVisible ? 'Скрыть список матчей' : 'Показать список матчей'}
-        aria-pressed={!asideVisible}
-        title={asideVisible ? 'Скрыть список матчей' : 'Показать список матчей'}
+        onClick={onToggleLogPanel}
+        aria-label={logPanelVisible ? 'Скрыть логи Redis' : 'Показать логи Redis'}
+        aria-pressed={!logPanelVisible}
+        title={logPanelVisible ? 'Скрыть логи Redis' : 'Показать логи Redis'}
         className="rounded p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 transition"
       >
         <svg

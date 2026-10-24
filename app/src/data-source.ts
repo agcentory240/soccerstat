@@ -1,3 +1,5 @@
+// Должен идти первым: TypeORM CLI читает process.env на этапе создания DataSource.
+import './env.js';
 import { DataSource } from 'typeorm';
 import { MatchEntity } from './matches/match.entity.js';
 

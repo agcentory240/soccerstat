@@ -1,3 +1,5 @@
+// Должен идти первым: загружает .env до чтения process.env в конфигах.
+import './env.js';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { MicroserviceOptions } from '@nestjs/microservices';

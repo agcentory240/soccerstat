@@ -83,7 +83,7 @@ frontend/src/
 - Стили: Tailwind-классы для компоновки; SCSS-модули — для специфичных компонентов.
 - Пользовательские тексты — на русском.
 - Markdown от AI рендери через `Markdown`-компонент, не вставляй HTML через `dangerouslySetInnerHTML`.
-- `TopMenu` содержит выпадающее меню «Сервис» (pgAdmin, RabbitMQ, Redis Insight, API) и кнопку-бутерброд, которая скрывает левый `aside` со списком матчей. Видимость `aside` хранится в `Layout` и передаётся через `Outlet context` (`LayoutContext`).
+- `TopMenu` содержит выпадающее меню «Сервис» (pgAdmin, RabbitMQ, Redis Insight, API) и кнопку-бутерброд справа, которая скрывает/показывает правую панель [`RedisLogPanel`](frontend/src/components/RedisLogPanel/RedisLogPanel.tsx) с логами Redis. Видимость панели хранится в `Layout`; сама панель рендерится вне `Outlet`, поэтому живёт на всех страницах. Левый `aside` со списком матчей в `MatchesPage` показывается всегда.
 
 Генерация заготовок: `vite-plugin-create`, конфиг `frontend/vite-create.config.json`, шаблоны в `frontend/templates/`. Каталог `templates/` исключён из ESLint, так как содержит плейсхолдеры `{{name}}`.
 

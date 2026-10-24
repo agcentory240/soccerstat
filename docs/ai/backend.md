@@ -114,7 +114,8 @@ npm run build:api      # nest build
 
 | Симптом | Причина / решение |
 |---|---|
-| `ECONNREFUSED postgres:5432` при локальном запуске | `DB_HOST` по умолчанию `postgres`; задай `DB_HOST=localhost` |
+| `ECONNREFUSED postgres:5432` при локальном запуске | `DB_HOST` по умолчанию `postgres`; задай `DB_HOST=localhost` в `app/.env` (он перекрывает корневой `.env`) |
+| `OpenAIError: Missing credentials` | Не задан `AI_API_KEY`: заполни его в `app/.env` или корневом `.env` — загрузчик [`env.ts`](../app/src/env.ts) подхватит файл автоматически |
 | `EACCES: permission denied, rmdir app/dist/...` | `dist` создан Docker-контейнером от root; останови контейнер и удали каталог из контейнера/с хоста с правами |
 | `EBADENGINE` | NestJS CLI 12 требует Node 22+; обнови Node |
 | `Redis недоступен` в логах | Подними контейнер `redis` (`docker compose up -d redis`) или задай `REDIS_URL`; API продолжит работать без реалтайм-состояния |
