@@ -1,0 +1,88 @@
+import { Link } from 'react-router-dom';
+import type { Match } from '../../types/match';
+
+interface MatchCardProps {
+  match: Match;
+}
+
+export function MatchCard({ match }: MatchCardProps) {
+  return (
+    <Link to={`/prognoses/${match.id}`}>
+      <div
+        className={`
+        p-3 rounded-lg border cursor-pointer transition
+        ${match.selected
+            ? 'bg-emerald-950/40 border-emerald-700 hover:bg-emerald-950/60'
+            : 'bg-slate-900 border-slate-800 hover:bg-slate-800'
+          }
+      `}
+      >
+        <div className="text-xs text-slate-400 mb-1">
+          {match.country} · {match.league}
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+          <span>{formatDateTime(match.dateTime)}</span>
+          {match.liveTime && (
+            <span className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold">
+              {match.liveTime}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">{match.homeTeam}</div>
+            <div className="text-sm font-medium truncate">{match.awayTeam}</div>
+          </div>
+          {match.score && (
+            <div className="text-lg font-bold text-emerald-400 ml-2">
+              {match.score}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 text-xs">
+          <OddBadge label="П1" value={match.oddsHome} />
+          <OddBadge label="X" value={match.oddsDraw} />
+          <OddBadge label="П2" value={match.oddsAway} />
+        </div>
+
+        {match.aiReason && (
+          <div className="flex items-center gap-1 text-xs pt-2">
+            <span className="px-1.5 py-0.5 bg-green-800 rounded text-slate-300">
+              <span className="text-yellow-00 font-bold text-2xl pr-1">{match.aiScore}</span>
+              <span className="text-yellow-00">{match.aiReason}</span>
+            </span>
+          </div>
+        )}
+
+
+        <a
+          href={match.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-block mt-2 text-xs text-emerald-400 hover:text-emerald-300 underline"
+        >
+          Открыть на nb-bet →
+        </a>
+      </div>
+    </Link>
+  );
+}
+
+function OddBadge({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <span className="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300">
+      <span className="text-slate-500">{label}</span> {value}
+    </span>
+  );
+}
+
+function formatDateTime(dateTime: string): string {
+  const d = new Date(dateTime);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

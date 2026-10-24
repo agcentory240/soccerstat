@@ -1,0 +1,77 @@
+services:
+  # Node.js сервер (пока можно оставить как есть или использовать простой образ)
+  node-app:
+    build: ./app # Папка, где будет лежать твой проект
+    container_name: soccer-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=postgres # Имя сервиса базы данных
+      - DB_USER=${DB_USER:-myuser}
+      - DB_PASSWORD=${DB_PASSWORD:-mypassword}
+      - DB_NAME=${DB_NAME:-mydb}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.deepseek.com}
+      - AI_API_KEY=${AI_API_KEY:?AI_API_KEY is required}
+      - AI_MODEL=${AI_MODEL:-deepseek-flash}
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ./app:/usr/src/app # Монтируем исходники
+    depends_on:
+      - postgres
+    networks:
+      - app-network      
+
+  # База данных PostgreSQL
+  postgres:
+    image: postgres:17
+    container_name: soccer-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-myuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mypassword}
+      POSTGRES_DB: ${DB_NAME:-mydb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Volume для данных базы
+    networks:
+      - app-network
+
+  # Админка pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: my-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: soccer-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Web UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - app-network
+
+# Определяем volume для данных
+volumes:
+  postgres_data:
+
+# Определяем сеть для связи сервисов
+networks:
+  app-network:
+    driver: bridge

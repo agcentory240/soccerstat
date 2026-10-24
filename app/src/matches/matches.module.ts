@@ -1,0 +1,16 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { MatchEntity } from './match.entity.js';
+import { MatchesService } from './matches.service.js';
+import { MatchesController } from './matches.controller.js';
+import { AiModule } from '../ai/ai.module.js';
+import { MatchesAnalyzerService } from './matches-analyzer.service.js';
+import { RabbitmqModule } from '../rabbitmq/rabbitmq.module.js';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([MatchEntity]), AiModule.register(),RabbitmqModule],
+  providers: [MatchesService,MatchesAnalyzerService],
+  controllers: [MatchesController],
+  exports: [MatchesService,MatchesAnalyzerService],
+})
+export class MatchesModule {}

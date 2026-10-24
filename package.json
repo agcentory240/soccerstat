@@ -1,0 +1,40 @@
+{
+  "name": "soccerstat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SoccerStat — парсинг футбольных матчей и их AI-анализ (NestJS + React)",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "app",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently --names api,web --prefix-colors cyan,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run start:dev --workspace @soccerstat/api",
+    "dev:web": "npm run dev --workspace @soccerstat/frontend",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "npm run build --workspace @soccerstat/api",
+    "build:web": "npm run build --workspace @soccerstat/frontend",
+    "start:api": "npm run start --workspace @soccerstat/api",
+    "start:prod": "npm run start:prod --workspace @soccerstat/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "npm run format --workspace @soccerstat/api",
+    "test": "npm run test --workspace @soccerstat/api",
+    "test:watch": "npm run test:watch --workspace @soccerstat/api",
+    "test:cov": "npm run test:cov --workspace @soccerstat/api",
+    "test:e2e": "npm run test:e2e --workspace @soccerstat/api",
+    "migrate:show": "npm run migrate:show --workspace @soccerstat/api",
+    "migrate:run": "npm run migrate:run --workspace @soccerstat/api",
+    "migrate:create": "npm run migrate:create --workspace @soccerstat/api",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f node-app"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

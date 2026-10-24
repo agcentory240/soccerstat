@@ -1,0 +1,50 @@
+# ===== Зависимости =====
+node_modules/
+.pnp
+.pnp.js
+
+# ===== Сборка =====
+dist/
+build/
+*.tsbuildinfo
+
+# ===== Артефакты отладки парсера =====
+debug/
+**/debug/
+playwright-report/
+test-results/
+
+# ===== Покрытие тестов =====
+coverage/
+.nyc_output/
+
+# ===== Логи =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== Переменные окружения =====
+.env
+.env.*
+!.env.example
+
+# ===== IDE / OS =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.sw?
+*.sublime-workspace
+
+# ===== Временные файлы =====
+.temp/
+.tmp/
+*.local
+pids
+*.pid
+*.seed
+*.pid.lock

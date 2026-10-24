@@ -1,0 +1,140 @@
+# Архитектура SoccerStat
+
+## 1. Общая схема
+
+```text
+nb-bet.com
+   │  Playwright + JSDOM
+   ▼
+Парсер (NestJS, app/src/nb-bet-parser-main)
+   │  upsert
+   ▼
+PostgreSQL (matches)
+   │
+   ├──► Быстрый AI-анализ (deepseek-flash) ──► aiScore, aiReason, aiMarket, selected
+   │
+   └──► Глубокий AI-анализ (deepseek-v4-pro) ──► deepAnalysis, finalDecision, mainBet, ...
+
+RabbitMQ (matches_queue)
+   ├── matches.parsed
+   └── matches.analyzed
+
+Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
+```
+
+## 2. Компоненты
+
+### API (`app/`)
+
+Один NestJS-процесс:
+
+- HTTP-сервер на `PORT ?? 3000`, CORS включён;
+- RabbitMQ-микросервис, очередь `matches_queue`, `noAck: false`;
+- планировщик `@nestjs/schedule` подключён, но cron парсера закомментирован.
+
+Модули:
+
+| Модуль | Ответственность |
+|---|---|
+| `AiModule` | Обёртка над OpenAI SDK для DeepSeek, JSON-парсинг ответов |
+| `MatchesModule` | Сущность, репозиторий, оценка и глубокий анализ |
+| `NbBetParserMainModule` | Парсинг списка матчей и деталей |
+| `RabbitmqModule` | Клиент для публикации событий |
+
+### Frontend (`frontend/`)
+
+- React 19 + Vite 8 + TypeScript;
+- React Router: `/` → `/prognoses`, детали `/prognoses/:id`;
+- Zustand-стор для списка матчей;
+- Tailwind CSS 4 (плагин Vite) + SCSS-модули компонентов;
+- Markdown-рендеринг ответов AI (`react-markdown`).
+
+### Инфраструктура
+
+`docker-compose.yml`:
+
+| Сервис | Порт | Назначение |
+|---|---|---|
+| `node-app` | 3000 | API |
+| `postgres` | 5432 | PostgreSQL 17 |
+| `pgadmin` | 5050 | Админка БД |
+| `rabbitmq` | 5672 / 15672 | Очередь / Web UI |
+
+## 3. API-контракт
+
+| Метод | Путь | Описание |
+|---|---|---|
+| `GET` | `/matches` | Матчи с `aiScore > 3`, сортировка по `dateTime ASC` |
+| `GET` | `/matches/by-date?date=YYYY-MM-DD` | Матчи за дату |
+| `GET` | `/matches/:id` | Полная сущность матча |
+| `POST` | `/matches/analyze` | Оценить до 50 неоценённых матчей |
+| `GET` | `/matches/:id/deep` | Глубокий анализ одного матча |
+| `GET` | `/parser/matches` | Спарсить список матчей |
+| `GET` | `/parser/matches/:id` | Спарсить детали матча по `url` |
+
+Ответы возвращают **сущность в camelCase**: `oddsHome`, `oddsDraw`, `oddsAway`, `aiScore`, `deepAnalysis` и т.д. Вложенного объекта `odds` в HTTP-ответах нет — он существует только во внутреннем DTO парсера.
+
+## 4. Модель данных
+
+Таблица `matches` (`MatchEntity`):
+
+- Идентификация: `id`, `url` (уникальный индекс);
+- Матч: `country`, `league`, `dateTime`, `homeTeam`, `awayTeam`, `score`, `liveTime`;
+- Коэффициенты: `oddsHome`, `oddsDraw`, `oddsAway` (`decimal`);
+- Состояния: `marked`, `ready`, `selected`;
+- Быстрый анализ: `aiScore` (smallint), `aiReason`, `aiMarket`;
+- Текстовые данные парсера: `info`, `reason`;
+- Глубокий анализ: `deepAnalyzed`, `finalDecision`, `mainBet`, `betCoefficient`, `confidence`, `expectedValue`, `stakeRecommendation`, `deepReasoning`, `summary`, `deepAnalysis` (JSONB), `deepAnalyzedAt`;
+- Служебное: `createdAt`.
+
+Миграции: `app/src/migrations/`. `data-source.ts` содержит `synchronize: true` — учитывай это при работе с миграциями и не полагайся на автосинхронизацию в production.
+
+## 5. Потоки данных
+
+### Парсинг списка
+
+1. `GET /parser/matches` → `NbBetParserMainService.parseMatches()`.
+2. Playwright открывает `https://nb-bet.com/Results`, закрывает cookie-баннер.
+3. HTML сохраняется в `app/debug/` и разбирается через JSDOM.
+4. `MatchesService.saveMany()` делает upsert по `url`.
+5. Публикуется событие `matches.parsed`.
+
+### Быстрый AI-анализ
+
+1. `POST /matches/analyze` → `MatchesAnalyzerService.analyzeUnprocessed()`.
+2. Берутся до 50 матчей с `aiScore IS NULL` и `score IS NULL`.
+3. `deepseek-flash` возвращает JSON `{ matches: [{ id, score, reason, market }] }`.
+4. Оценки сохраняются; топ-10 с `score >= 6` получает `selected = true`.
+5. Публикуется `matches.analyzed`.
+
+### Глубокий анализ
+
+1. `GET /matches/:id/deep`.
+2. Если `deepAnalyzed = true`, возвращается сохранённый `deepAnalysis`.
+3. Иначе собирается Markdown из `info` (или из полей матча).
+4. `deepseek-v4-pro` с `thinking: true` возвращает JSON-решение.
+5. Результат сохраняется в поля сущности и `deepAnalysis`.
+
+## 6. Конфигурация окружения
+
+| Переменная | По умолчанию | Комментарий |
+|---|---|---|
+| `DB_HOST` | `postgres` (API), `localhost` (data-source) | В Docker — `postgres` |
+| `DB_PORT` | `5432` | |
+| `DB_USER` | `myuser` | |
+| `DB_PASSWORD` | `mypassword` | |
+| `DB_NAME` | `mydb` | |
+| `AI_BASE_URL` | `https://api.deepseek.com` | |
+| `AI_API_KEY` | — | Обязателен; только в `.env` |
+| `AI_MODEL` | `deepseek-flash` | Модель по умолчанию |
+| `RABBITMQ_URI` | `amqp://guest:guest@rabbitmq:5672` | |
+| `PORT` | `3000` | |
+
+Важно: приложение не загружает `.env` самостоятельно. Для локального запуска переменные должны быть в окружении процесса, либо используй Docker Compose, который читает `.env` автоматически.
+
+## 7. Известные особенности
+
+- В `matches-analyzer.service.ts` модели `deepseek-flash` и `deepseek-v4-pro` заданы явно, `AI_MODEL` влияет только на дефолт `AiService`.
+- DeepSeek в thinking-режиме может вернуть пустой `content` и заполненный `reasoning_content`; `AiService` промоутит reasoning в content.
+- `AiService.chatJson()` устойчив к markdown-обёртке, мусору и обрезанному JSON, но это не отменяет валидацию схемы на уровне сервисов.
+- Парсер сохраняет HTML в `app/debug/` — каталог может разрастаться и исключён из git.
