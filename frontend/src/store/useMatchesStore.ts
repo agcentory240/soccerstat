@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { analyzeMatches, fetchMatches, parseMatches } from '../api/matches'
+import { subscribeToServerState } from '../api/events'
 import type { Match } from '../types/match'
+import type { ServerStateEvent } from '../types/state'
 import { getErrorMessage } from '../utils/error'
+
+/** Активная подписка на SSE, чтобы не открывать соединение повторно. */
+let stopEvents: (() => void) | null = null
 
 interface MatchesState {
   matches: Match[]
@@ -9,8 +14,12 @@ interface MatchesState {
   refreshing: boolean   // ← отдельный флаг для "Обновить матчи"
   error: string | null
 
+  serverState: ServerStateEvent | null   // ← состояние сервера из Redis через SSE
+  eventsConnected: boolean
+
   loadMatches: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
+  connectEvents: () => () => void   // ← подписка на состояние сервера
 }
 
 export const useMatchesStore = create<MatchesState>((set, get) => ({
@@ -18,6 +27,8 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
   loading: false,
   refreshing: false,
   error: null,
+  serverState: null,
+  eventsConnected: false,
 
   loadMatches: async () => {
     if (get().loading) return
@@ -47,6 +58,37 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
       set({ error: getErrorMessage(e) })
     } finally {
       set({ refreshing: false })
+    }
+  },
+
+  connectEvents: () => {
+    if (stopEvents) return stopEvents
+
+    let isFirstMessage = true
+
+    stopEvents = subscribeToServerState({
+      onState: (state) => {
+        set({ serverState: state })
+
+        // Первое сообщение — снапшот при подключении, список уже загружен страницей.
+        if (isFirstMessage) {
+          isFirstMessage = false
+          return
+        }
+
+        // Сервер завершил парсинг или анализ — обновляем список матчей.
+        if (state.status === 'done' && (state.stage === 'parsed' || state.stage === 'analyzed')) {
+          void get().loadMatches()
+        }
+      },
+      onConnectionChange: (connected) => set({ eventsConnected: connected }),
+    })
+
+    const stop = stopEvents
+    return () => {
+      stop()
+      stopEvents = null
+      set({ eventsConnected: false })
     }
   },
 }))

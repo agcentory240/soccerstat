@@ -8,11 +8,13 @@ import { AiModule } from './ai/ai.module.js';
 import { MatchesModule } from './matches/matches.module.js';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RabbitmqModule } from './rabbitmq/rabbitmq.module.js';
+import { StateModule } from './state/state.module.js';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     RabbitmqModule,
+    StateModule,
     AiModule.register({
       // Можно переопределить здесь, или оставить — тогда возьмётся из env
       // baseUrl: 'https://api.deepseek.com',

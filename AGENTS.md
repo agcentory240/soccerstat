@@ -23,9 +23,9 @@
 
 | Путь | Пакет | Назначение |
 |---|---|---|
-| `app/` | `@soccerstat/api` | NestJS 12, TypeORM, PostgreSQL, RabbitMQ, Playwright |
+| `app/` | `@soccerstat/api` | NestJS 12, TypeORM, PostgreSQL, RabbitMQ, Redis, Playwright |
 | `frontend/` | `@soccerstat/frontend` | React 19, Vite 8, Zustand, React Router, Tailwind 4 |
-| `docker-compose.yml` | — | PostgreSQL, pgAdmin, RabbitMQ, API |
+| `docker-compose.yml` | — | PostgreSQL, pgAdmin, RabbitMQ, Redis, API |
 | `docs/ai/` | — | Подробные инструкции для агентов |
 
 Исходные отдельные git-репозитории `app` и `frontend` удалены. Актуальный репозиторий — корневой `soccerstat`.
@@ -56,6 +56,7 @@ npm run docker:up           # требует AI_API_KEY в .env
 - Frontend: `http://localhost:5173`
 - pgAdmin: `http://localhost:5050`
 - RabbitMQ UI: `http://localhost:15672`
+- Redis: `localhost:6379`
 
 Рекомендуемая версия Node.js — **22 LTS**. На Node 20 основная сборка работает, но часть инструментов NestJS CLI 12 выдаёт предупреждения `EBADENGINE`.
 
@@ -86,7 +87,7 @@ npm run docker:up           # требует AI_API_KEY в .env
 1. Прочитай `AGENTS.md` и профильный документ из `docs/ai/`.
 2. Найди существующую реализацию и переиспользуй её. Не создавай дублирующие сервисы, хелперы и типы.
 3. Определи, к какому workspace относится задача (`app` или `frontend`).
-4. Если меняется контракт API — синхронизируй backend и `frontend/src/types/match.ts`.
+4. Если меняется контракт API — синхронизируй backend и `frontend/src/types/match.ts`; контракт состояния сервера — `frontend/src/types/state.ts`.
 
 ### 5.2. При изменениях
 
@@ -130,6 +131,7 @@ npm test
 
 - HTTP API и RabbitMQ-микросервис запускаются из одного NestJS-процесса (`app/src/main.ts`).
 - Очередь RabbitMQ: `matches_queue`; события: `matches.parsed`, `matches.analyzed`.
+- Состояние сервера публикуется через `StateService` в Redis-канал `soccerstat:state` и раздаётся фронтенду через SSE `GET /events`. Не публикуй состояние в Redis напрямую из парсера/анализатора — используй `StateService`.
 - Основная сущность — `MatchEntity` (`app/src/matches/match.entity.ts`), таблица `matches`.
 - Парсер пишет отладочный HTML в `app/debug/` (каталог исключён из git).
 - Оценка матча хранится в `aiScore` (0–10), глубокий анализ — в `deepAnalysis` (JSONB) и связанных полях.

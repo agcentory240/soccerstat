@@ -4,9 +4,9 @@
 
 ## Стек
 
-- **API:** NestJS 12, TypeORM, PostgreSQL 17, RabbitMQ, Playwright + JSDOM, OpenAI SDK (DeepSeek).
+- **API:** NestJS 12, TypeORM, PostgreSQL 17, RabbitMQ, Redis, Playwright + JSDOM, OpenAI SDK (DeepSeek).
 - **Frontend:** React 19, Vite 8, TypeScript, Zustand, React Router, Tailwind CSS 4.
-- **Инфраструктура:** Docker Compose (PostgreSQL, pgAdmin, RabbitMQ, API).
+- **Инфраструктура:** Docker Compose (PostgreSQL, pgAdmin, RabbitMQ, Redis, API).
 
 ## Структура
 
@@ -28,7 +28,7 @@ npm install               # один lock-файл и общие node_modules
 npm run dev               # API :3000 + frontend :5173
 ```
 
-Для локального API без Docker задайте `DB_HOST=localhost` (или запустите `docker compose up -d postgres rabbitmq`).
+Для локального API без Docker задайте `DB_HOST=localhost` (или запустите `docker compose up -d postgres rabbitmq redis`).
 
 ### Docker Compose
 
@@ -42,6 +42,7 @@ npm run docker:down
 - Frontend: http://localhost:5173
 - pgAdmin: http://localhost:5050
 - RabbitMQ UI: http://localhost:15672
+- Redis: `localhost:6379`
 
 ## Команды
 
@@ -67,6 +68,7 @@ npm run docker:down
 | `GET` | `/matches/:id/deep` | Глубокий AI-анализ |
 | `GET` | `/parser/matches` | Парсинг списка матчей |
 | `GET` | `/parser/matches/:id` | Парсинг деталей матча |
+| `GET` | `/events` | SSE-поток состояния сервера (Redis pub/sub) |
 
 ## Документация
 

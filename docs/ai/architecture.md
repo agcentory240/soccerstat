@@ -19,7 +19,12 @@ RabbitMQ (matches_queue)
    ├── matches.parsed
    └── matches.analyzed
 
-Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
+Состояние операций
+NestJS StateService ──publish──► Redis (канал soccerstat:state)
+                                      │  subscribe
+                                      ▼
+Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
+                              HTTP
 ```
 
 ## 2. Компоненты
@@ -40,12 +45,14 @@ Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
 | `MatchesModule` | Сущность, репозиторий, оценка и глубокий анализ |
 | `NbBetParserMainModule` | Парсинг списка матчей и деталей |
 | `RabbitmqModule` | Клиент для публикации событий |
+| `StateModule` | Состояние сервера: Redis pub/sub + SSE-поток для фронтенда |
 
 ### Frontend (`frontend/`)
 
 - React 19 + Vite 8 + TypeScript;
 - React Router: `/` → `/prognoses`, детали `/prognoses/:id`;
-- Zustand-стор для списка матчей;
+- Zustand-стор для списка матчей и состояния сервера;
+- SSE-подписка на `GET /events` (EventSource), индикатор статуса в `TopMenu`;
 - Tailwind CSS 4 (плагин Vite) + SCSS-модули компонентов;
 - Markdown-рендеринг ответов AI (`react-markdown`).
 
@@ -59,6 +66,7 @@ Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
 | `postgres` | 5432 | PostgreSQL 17 |
 | `pgadmin` | 5050 | Админка БД |
 | `rabbitmq` | 5672 / 15672 | Очередь / Web UI |
+| `redis` | 6379 | Pub/sub состояния (канал `soccerstat:state`) |
 
 ## 3. API-контракт
 
@@ -71,6 +79,7 @@ Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
 | `GET` | `/matches/:id/deep` | Глубокий анализ одного матча |
 | `GET` | `/parser/matches` | Спарсить список матчей |
 | `GET` | `/parser/matches/:id` | Спарсить детали матча по `url` |
+| `GET` | `/events` | SSE-поток состояния сервера (status/stage/message/progress) |
 
 Ответы возвращают **сущность в camelCase**: `oddsHome`, `oddsDraw`, `oddsAway`, `aiScore`, `deepAnalysis` и т.д. Вложенного объекта `odds` в HTTP-ответах нет — он существует только во внутреннем DTO парсера.
 
@@ -115,6 +124,16 @@ Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
 4. `deepseek-v4-pro` с `thinking: true` возвращает JSON-решение.
 5. Результат сохраняется в поля сущности и `deepAnalysis`.
 
+### Состояние сервера (Redis → SSE)
+
+1. Парсер и анализатор вызывают методы `StateService` (`parsingStart`, `analyzingProgress`, `deepDone`, `fail` и т.д.).
+2. `StateService.update()` формирует событие `{ type: 'state', status, stage, message, progress, updatedAt }` и публикует его в Redis-канал `soccerstat:state` (`RedisService.publishState`).
+3. `RedisService` подписан на тот же канал и раздаёт события локальным RxJS-подписчикам.
+4. `GET /events` (`StateController`, `@Sse()`) отправляет новому клиенту снапшот и далее все обновления; каждые 15 секунд — heartbeat.
+5. Фронтенд (`EventSource`) обновляет индикатор в `TopMenu` и перезагружает список матчей после `status = done` на стадиях `parsed` / `analyzed`.
+
+Если Redis недоступен, приложение продолжает работать: состояние отдаётся локальным подписчикам процесса API.
+
 ## 6. Конфигурация окружения
 
 | Переменная | По умолчанию | Комментарий |
@@ -128,6 +147,7 @@ Frontend (React + Vite) ──HTTP──► NestJS API (:3000)
 | `AI_API_KEY` | — | Обязателен; только в `.env` |
 | `AI_MODEL` | `deepseek-flash` | Модель по умолчанию |
 | `RABBITMQ_URI` | `amqp://guest:guest@rabbitmq:5672` | |
+| `REDIS_URL` | `redis://localhost:6379` | В Docker — `redis://redis:6379` |
 | `PORT` | `3000` | |
 
 Важно: приложение не загружает `.env` самостоятельно. Для локального запуска переменные должны быть в окружении процесса, либо используй Docker Compose, который читает `.env` автоматически.

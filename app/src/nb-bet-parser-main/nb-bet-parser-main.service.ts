@@ -9,6 +9,7 @@ import type { Browser, Page } from 'playwright';
 import { JSDOM } from 'jsdom';
 import { MatchesService } from '../matches/matches.service.js';
 import { ClientProxy } from '@nestjs/microservices';
+import { StateService } from '../state/state.service.js';
 
 chromium.use(StealthPlugin());
 
@@ -19,10 +20,13 @@ export class NbBetParserMainService {
 
   constructor(
     private readonly matchesService: MatchesService,
-    @Inject('MATCHES_SERVICE') private readonly client: ClientProxy, 
+    @Inject('MATCHES_SERVICE') private readonly client: ClientProxy,
+    private readonly stateService: StateService,
   ) {}
 
   async parseMatches(): Promise<Match[]> {
+    await this.stateService.parsingStart();
+
     const browser: Browser = await chromium.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -50,8 +54,15 @@ export class NbBetParserMainService {
       // console.log(JSON.stringify(matches[Object.keys(matches)[0]], null, 2));
       await this.matchesService.saveMany(matches);
       this.client.emit('matches.parsed', { count: matches.length });
+      await this.stateService.parsingDone(matches.length);
       return matches;
 
+    } catch (err) {
+      await this.stateService.fail(
+        'parsing',
+        `Ошибка парсинга: ${(err as Error).message}`,
+      );
+      throw err;
     } finally {
       await browser.close();
     }

@@ -6,9 +6,15 @@ import { MatchesController } from './matches.controller.js';
 import { AiModule } from '../ai/ai.module.js';
 import { MatchesAnalyzerService } from './matches-analyzer.service.js';
 import { RabbitmqModule } from '../rabbitmq/rabbitmq.module.js';
+import { StateModule } from '../state/state.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MatchEntity]), AiModule.register(),RabbitmqModule],
+  imports: [
+    TypeOrmModule.forFeature([MatchEntity]),
+    AiModule.register(),
+    RabbitmqModule,
+    StateModule,
+  ],
   providers: [MatchesService,MatchesAnalyzerService],
   controllers: [MatchesController],
   exports: [MatchesService,MatchesAnalyzerService],

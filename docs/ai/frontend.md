@@ -8,12 +8,12 @@
 
 ```text
 frontend/src/
-├── api/           # HTTP-клиент (matches.ts)
+├── api/           # HTTP-клиент (matches.ts) и SSE-подписка (events.ts)
 ├── components/    # Layout, MatchCard, MatchList, MatchDetails, Markdown, TopMenu
 ├── hooks/         # useMatch
 ├── pages/         # MatchesPage
 ├── store/         # useMatchesStore (Zustand)
-├── types/         # match.ts — контракт API
+├── types/         # match.ts — контракт API, state.ts — состояние сервера
 ├── utils/         # error.ts — извлечение сообщения из unknown
 └── App.tsx        # роутинг
 ```
@@ -34,8 +34,10 @@ frontend/src/
 `useMatchesStore`:
 
 - `matches`, `loading`, `refreshing`, `error`;
+- `serverState`, `eventsConnected` — состояние сервера из SSE и статус соединения;
 - `loadMatches()` — `GET /matches`, сортировка (selected сверху, затем по дате), лимит 500;
-- `refreshAll()` — парсинг → анализ → повторная загрузка.
+- `refreshAll()` — парсинг → анализ → повторная загрузка;
+- `connectEvents()` — открывает `EventSource` на `GET /events`, возвращает функцию отписки. Повторный вызов не создаёт новое соединение. При `status = done` на стадиях `parsed` / `analyzed` автоматически вызывает `loadMatches()`.
 
 Правила:
 
@@ -45,15 +47,21 @@ frontend/src/
 
 ## 4. API-слой
 
-`src/api/matches.ts` — единственное место HTTP-запросов:
+`src/api/matches.ts` — HTTP-запросы:
 
+- `API_URL` — базовый адрес (`http://localhost:3000`), импортируй его, не дублируй строку;
 - `fetchMatches()`
 - `parseMatches()`
 - `analyzeMatches()`
 - `parseMatchDetails(id)`
 - `analizeMatchDetails(id)` (историческое имя, менять только вместе с вызовами)
 
-Сейчас базовый URL захардкожен: `http://localhost:3000`. При доработке:
+`src/api/events.ts` — SSE:
+
+- `subscribeToServerState({ onState, onConnectionChange })` — открывает `EventSource` на `${API_URL}/events`, парсит сообщения `type: 'state'`, игнорирует heartbeat (`type: 'ping'`), возвращает функцию отписки;
+- переподключение выполняет сам браузер, отдельный реконнект писать не нужно.
+
+При доработке базового URL:
 - вынеси его в `import.meta.env.VITE_API_URL` с fallback на `http://localhost:3000`;
 - обнови `.env.example`;
 - не дублируй URL в компонентах и хуках.
@@ -96,5 +104,6 @@ npm run build -w @soccerstat/frontend   # tsc -b && vite build
 
 - Всегда показывай состояния `loading`, `error`, `empty`.
 - Кнопки, запускающие парсинг/анализ, блокируй на время операции (`refreshing`/`parsing`).
+- Статус фоновых операций показывай из `serverState` (`TopMenu`): parsing/analyzing — анимация, error — красный, done — зелёный; прогресс бери из `progress`.
 - Не скрывай ошибки API — выводи понятное сообщение пользователю.
 - Даты и коэффициенты форматируй единообразно.

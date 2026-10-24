@@ -3,7 +3,7 @@
 ## 1. Точки входа
 
 - `app/src/main.ts` — создаёт Nest-приложение, подключает RabbitMQ-микросервис, включает CORS, слушает `PORT ?? 3000`.
-- `app/src/app.module.ts` — корневой модуль: `ScheduleModule`, `RabbitmqModule`, `AiModule.register()`, `TypeOrmModule.forRoot()`, парсер и матчи.
+- `app/src/app.module.ts` — корневой модуль: `ScheduleModule`, `RabbitmqModule`, `StateModule`, `AiModule.register()`, `TypeOrmModule.forRoot()`, парсер и матчи.
 - `app/src/data-source.ts` — DataSource для TypeORM CLI (миграции).
 
 ## 2. Соглашения кода
@@ -67,6 +67,18 @@ import { MatchesService } from './matches.service.js';
 - События: `matches.parsed`, `matches.analyzed`.
 - Обработчик `@EventPattern('matches.parsed')` в контроллере закомментирован — если включаешь, не забудь `ack`.
 
+### `StateModule`
+
+Файлы — `app/src/state/`.
+
+- `state.config.ts` — `REDIS_URL` (по умолчанию `redis://localhost:6379`) и канал `STATE_CHANNEL = 'soccerstat:state'`.
+- `state.types.ts` — контракт `ServerStateEvent` (`type`, `status`, `stage`, `message`, `progress`, `updatedAt`). При изменении синхронизируй `frontend/src/types/state.ts`.
+- `RedisService` — publisher и subscriber `ioredis`. Redis **не критичен**: при недоступности состояние доставляется локальным подписчикам, приложение не падает. `onModuleInit` не бросает исключений, ошибки только логируются.
+- `StateService` — единственная точка публикации: `parsingStart/Done`, `analyzingStart/Progress/Done`, `deepStart/Done`, `fail`, базовый `update(patch)`. Инжектится в `NbBetParserMainService` и `MatchesAnalyzerService`.
+- `StateController` — `@Sse()` на `GET /events`: первым сообщением снапшот, далее обновления и heartbeat каждые 15 с.
+
+Правило: не публикуй состояние напрямую в Redis из сервисов — используй `StateService`, чтобы формат события оставался единым.
+
 ## 4. База данных и миграции
 
 - Сущность: `app/src/matches/match.entity.ts`.
@@ -101,6 +113,7 @@ npm run build:api      # nest build
 | `ECONNREFUSED postgres:5432` при локальном запуске | `DB_HOST` по умолчанию `postgres`; задай `DB_HOST=localhost` |
 | `EACCES: permission denied, rmdir app/dist/...` | `dist` создан Docker-контейнером от root; останови контейнер и удали каталог из контейнера/с хоста с правами |
 | `EBADENGINE` | NestJS CLI 12 требует Node 22+; обнови Node |
+| `Redis недоступен` в логах | Подними контейнер `redis` (`docker compose up -d redis`) или задай `REDIS_URL`; API продолжит работать без реалтайм-состояния |
 | Пустой ответ AI | DeepSeek вернул `reasoning_content`; `AiService` уже обрабатывает это |
 | Ошибка JSON от AI | Проверь `maxTokens`, `finish_reason=length`, схему ответа |
 | Парсер не находит элементы | Изменилась вёрстка nb-bet; обнови `helpers/extract-*.ts` |

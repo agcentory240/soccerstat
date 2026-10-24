@@ -11,6 +11,7 @@ import {
   DEEP_ANALYSIS_SYSTEM_PROMPT,
 } from '../ai/ai-prompts.js';
 import { ClientProxy } from '@nestjs/microservices';
+import { StateService } from '../state/state.service.js';
 
 @Injectable()
 export class MatchesAnalyzerService {
@@ -24,6 +25,7 @@ export class MatchesAnalyzerService {
     private readonly repo: Repository<MatchEntity>,
     private readonly aiService: AiService,
     @Inject('MATCHES_SERVICE') private readonly client: ClientProxy,
+    private readonly stateService: StateService,
   ) { }
 
   async analyzeUnprocessed(): Promise<{ sent: number; selected: number }> {
@@ -39,10 +41,17 @@ export class MatchesAnalyzerService {
 
     if (candidates.length === 0) {
       this.logger.log('No matches to analyze');
+      await this.stateService.update({
+        status: 'idle',
+        stage: null,
+        message: 'Нет матчей для AI-анализа',
+        progress: null,
+      });
       return { sent: 0, selected: 0 };
     }
 
     this.logger.log(`Sending ${candidates.length} matches to AI`);
+    await this.stateService.analyzingStart(candidates.length);
 
     // 2. Компактный список для AI
     const compactList = candidates.map((m) => ({
@@ -75,6 +84,7 @@ export class MatchesAnalyzerService {
       );
     } catch (err: any) {
       this.logger.error(`AI request failed: ${err.message}`);
+      await this.stateService.fail('analyzing', `Ошибка AI-анализа: ${err.message}`);
       throw err;
     }
 
@@ -121,6 +131,8 @@ export class MatchesAnalyzerService {
       selected: topMatches.length,
       topIds: topMatches.map((s) => s.id),
     });
+
+    await this.stateService.analyzingDone(candidates.length, topMatches.length);
 
     return { sent: candidates.length, selected: topMatches.length };
   }
@@ -213,11 +225,13 @@ export class MatchesAnalyzerService {
         deepReasoning: 'Недостаточно данных',
         deepAnalyzedAt: new Date(),
       });
+      await this.stateService.deepDone(matchId, 'ПРОПУСТИТЬ');
       return null;
     }
 
     // 3. Отправляем в DeepSeek Pro
     this.logger.log(`🔍 Deep analysis for match ${matchId}...`);
+    await this.stateService.deepStart(matchId);
 
     const userPrompt = `${md}
 
@@ -244,6 +258,10 @@ ID матча: ${matchId}.
       );
     } catch (err: any) {
       this.logger.error(`Deep analysis failed for ${matchId}: ${err.message}`);
+      await this.stateService.fail(
+        'deep',
+        `Ошибка глубокого анализа матча #${matchId}: ${err.message}`,
+      );
       throw err;
     }
 
@@ -253,6 +271,8 @@ ID матча: ${matchId}.
     this.logger.log(
       `✅ Match ${matchId}: ${result.final_decision} (conf=${result.prediction?.confidence})`,
     );
+
+    await this.stateService.deepDone(matchId, result.final_decision ?? null);
 
     return result;
   }
@@ -284,6 +304,7 @@ ID матча: ${matchId}.
 
     let success = 0;
     let failed = 0;
+    let processed = 0;
 
     for (const match of matches) {
       try {
@@ -293,6 +314,9 @@ ID матча: ${matchId}.
         failed++;
         this.logger.error(`Failed ${match.id}: ${err.message}`);
       }
+
+      processed++;
+      await this.stateService.analyzingProgress(processed, matches.length);
 
       // Пауза между запросами (rate limit)
       await new Promise((r) => setTimeout(r, 2000));

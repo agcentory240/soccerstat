@@ -8,10 +8,13 @@ export function MatchesPage() {
   const loading = useMatchesStore((s) => s.loading)
   const error = useMatchesStore((s) => s.error)
   const loadMatches = useMatchesStore((s) => s.loadMatches)
+  const connectEvents = useMatchesStore((s) => s.connectEvents)
 
   useEffect(() => {
     loadMatches()
   }, [loadMatches])
+
+  useEffect(() => connectEvents(), [connectEvents])
 
   return (
     <div className="flex h-full">

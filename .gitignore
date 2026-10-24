@@ -31,6 +31,11 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# ===== MCP (локальная конфигурация ИИ-клиента) =====
+# Реальный .mcp.json содержит параметры подключения к БД и не коммитится
+.mcp.json
+!.mcp.json.example
+
 # ===== IDE / OS =====
 .DS_Store
 Thumbs.db

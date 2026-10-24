@@ -38,7 +38,7 @@ DB_HOST=localhost npm run dev:api
 npm run dev:web
 ```
 
-Для локального API нужна доступная PostgreSQL (можно поднять только её через `docker compose up -d postgres rabbitmq`). Без `DB_HOST=localhost` API попытается подключиться к хосту `postgres`.
+Для локального API нужны PostgreSQL, RabbitMQ и Redis (можно поднять только их через `docker compose up -d postgres rabbitmq redis`). Без `DB_HOST=localhost` API попытается подключиться к хосту `postgres`, а без `REDIS_URL` — к `redis://localhost:6379`. Redis не обязателен для запуска: без него API работает, но состояние операций не транслируется на фронтенд.
 
 ### B. Docker Compose
 
@@ -49,6 +49,20 @@ npm run docker:down
 ```
 
 Docker Compose читает `.env` из корня. `AI_API_KEY` обязателен — compose завершится с ошибкой, если он не задан.
+
+### C. MCP-сервер для PostgreSQL
+
+Для прямого доступа ИИ-клиента (VS Code, Cursor, Claude Desktop) к базе используется `.mcp.json` в корне репозитория:
+
+```bash
+cp .mcp.json.example .mcp.json
+```
+
+Замените `<DB_USER>`, `<DB_PASSWORD>`, `<DB_PORT>` и `<DB_NAME>` на значения из `.env`. Для стандартного Docker Compose это `postgresql://myuser:mypassword@localhost:5432/mydb`.
+
+- `.mcp.json` исключён из git — в нём пароль БД; в репозитории хранится только `.mcp.json.example`.
+- Подключение идёт к `localhost:5432` (проброшенный порт контейнера `postgres`), а не к хосту `postgres` из Docker-сети.
+- Используется `@modelcontextprotocol/server-postgres` (read-only SQL-запросы). Пакет помечен как deprecated, но рабочий; при необходимости его можно заменить на поддерживаемую альтернативу.
 
 ## 4. Команды
 
@@ -107,6 +121,7 @@ npm test          # если затронуты сервисы/парсер/ан
 | `ECONNREFUSED postgres:5432` | Задай `DB_HOST=localhost` или запусти контейнер `postgres` |
 | `EACCES: permission denied, app/dist` | `dist` создан root-контейнером; останови контейнер и удали каталог с правами root |
 | `Не запускается frontend` | Проверь `npm install` из корня и наличие `frontend/node_modules` или корневого `node_modules` |
+| `Redis (publisher) недоступен` | Подними `redis` (`docker compose up -d redis`) или задай `REDIS_URL`; индикатор на фронтенде покажет «Нет связи с сервером» |
 | `Playwright: Executable doesn't exist` | `npx playwright install chromium` |
 | `AI provider: invalid API key` | Проверь `AI_API_KEY` в `.env` |
 | `AI provider: insufficient balance` | Пополни баланс провайдера |
