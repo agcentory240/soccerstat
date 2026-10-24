@@ -50,6 +50,8 @@ npm run docker:down
 
 Docker Compose читает `.env` из корня. `AI_API_KEY` обязателен — compose завершится с ошибкой, если он не задан.
 
+Веб-панели при запуске через Docker Compose: pgAdmin — `http://localhost:5050`, RabbitMQ Management — `http://localhost:15672`, Redis Insight — `http://localhost:5540`. Эти же ссылки собраны в выпадающем меню фронтенда «Сервис».
+
 ### C. MCP-сервер для PostgreSQL
 
 Для прямого доступа ИИ-клиента (VS Code, Cursor, Claude Desktop) к базе используется `.mcp.json` в корне репозитория:

@@ -11,12 +11,34 @@ export type ServerStateStage =
   | 'parsed'
   | 'analyzing'
   | 'analyzed'
+  | 'detail-parsed'
   | 'deep'
-  | 'deep-done';
+  | 'deep-done'
+  | 'all-done';
 
 export interface ServerStateProgress {
   processed: number;
   total: number;
+}
+
+/** Краткая информация о матче в событиях состояния. */
+export interface ServerStateMatchInfo {
+  id: number;
+  homeTeam: string;
+  awayTeam: string;
+  league: string;
+  url: string;
+  /** Финальное решение по матчу (только для `match_analize_complete`). */
+  decision?: string | null;
+}
+
+/** Дополнительный payload события состояния. */
+export interface ServerStateData {
+  count?: number;
+  total?: number;
+  selected?: number;
+  matches?: ServerStateMatchInfo[];
+  match?: ServerStateMatchInfo;
 }
 
 export interface ServerStateEvent {
@@ -26,6 +48,8 @@ export interface ServerStateEvent {
   message: string;
   progress: ServerStateProgress | null;
   updatedAt: string;
+  /** Дополнительные данные события (список матчей, инфо о матче и т.п.). */
+  data?: ServerStateData;
 }
 
 /** Служебный heartbeat, чтобы соединение не закрывалось прокси. */

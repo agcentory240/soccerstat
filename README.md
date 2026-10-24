@@ -43,6 +43,7 @@ npm run docker:down
 - pgAdmin: http://localhost:5050
 - RabbitMQ UI: http://localhost:15672
 - Redis: `localhost:6379`
+- Redis Insight: http://localhost:5540
 
 ## Команды
 

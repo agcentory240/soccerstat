@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { analyzeMatches, fetchMatches, parseMatches } from '../api/matches'
+import { fetchMatches, parseMatches } from '../api/matches'
 import { subscribeToServerState } from '../api/events'
 import type { Match } from '../types/match'
 import type { ServerStateEvent } from '../types/state'
@@ -47,11 +47,10 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     if (get().refreshing) return
     set({ refreshing: true, error: null })
     try {
-      // 1. Парсинг
+      // 1. Парсинг списка. Быстрый и глубокий AI-анализ запускаются
+      //    автоматически по событиям RabbitMQ (`matches.parsed` → `matches.analyzed`).
       await parseMatches()
-      // 2. Анализ
-      await analyzeMatches()
-      // 3. Перезагрузка списка
+      // 2. Перезагрузка списка
       const data = await fetchMatches()
       set({ matches: sortMatches(data).slice(0, 500) })
     } catch (e: unknown) {

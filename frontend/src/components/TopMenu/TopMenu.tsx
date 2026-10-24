@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useMatchesStore } from '../../store/useMatchesStore';
 import type { ServerStateEvent } from '../../types/state';
@@ -7,11 +8,18 @@ const INTERNAL_ITEMS = [
   { label: 'Live', to: '/live' },  // когда добавишь
 ];
 
-const EXTERNAL_ITEMS = [
+/** Служебные ссылки на внешние панели — собраны в выпадающее меню «Сервис». */
+const SERVICE_ITEMS = [
   { label: 'Админка БД', href: 'http://localhost:5050' },
   { label: 'RabbitMQ', href: 'http://localhost:15672' },
+  { label: 'Redis Insight', href: 'http://localhost:5540' },
   { label: 'Матчи (API)', href: 'http://localhost:3000/matches' },
 ];
+
+interface TopMenuProps {
+  asideVisible: boolean;
+  onToggleAside: () => void;
+}
 
 function describeState(state: ServerStateEvent | null, connected: boolean) {
   if (!connected) {
@@ -36,14 +44,38 @@ function describeState(state: ServerStateEvent | null, connected: boolean) {
   }
 }
 
-export function TopMenu() {
+export function TopMenu({ asideVisible, onToggleAside }: TopMenuProps) {
 
   const refreshing = useMatchesStore((s) => s.refreshing)
   const refreshAll = useMatchesStore((s) => s.refreshAll)
   const serverState = useMatchesStore((s) => s.serverState)
   const eventsConnected = useMatchesStore((s) => s.eventsConnected)
   const status = describeState(serverState, eventsConnected)
-  
+
+  const [serviceOpen, setServiceOpen] = useState(false)
+  const serviceRef = useRef<HTMLDivElement>(null)
+
+  // Закрываем выпадающее меню по клику вне его и по Escape.
+  useEffect(() => {
+    if (!serviceOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (serviceRef.current && !serviceRef.current.contains(event.target as Node)) {
+        setServiceOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setServiceOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [serviceOpen])
+
   return (
     <nav className="flex items-center gap-2 p-3 bg-slate-900 border-b border-slate-700">
       <span className="text-emerald-400 font-bold mr-4">SoccerStat</span>
@@ -64,17 +96,50 @@ export function TopMenu() {
         </NavLink>
       ))}
 
-      {EXTERNAL_ITEMS.map((item) => (
-        <a
-          key={item.href}
-          href={item.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition"
+      <div ref={serviceRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setServiceOpen((open) => !open)}
+          aria-haspopup="menu"
+          aria-expanded={serviceOpen}
+          className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition"
         >
-          {item.label}
-        </a>
-      ))}
+          Сервис
+          <svg
+            className={`h-3 w-3 transition-transform ${serviceOpen ? 'rotate-180' : ''}`}
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M2 4.5 6 8.5 10 4.5" />
+          </svg>
+        </button>
+
+        {serviceOpen && (
+          <div
+            role="menu"
+            className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-md border border-slate-700 bg-slate-800 py-1 shadow-lg"
+          >
+            {SERVICE_ITEMS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                role="menuitem"
+                onClick={() => setServiceOpen(false)}
+                className="block px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
 
       <button
         onClick={refreshAll}
@@ -101,6 +166,31 @@ export function TopMenu() {
           </span>
         )}
       </div>
+
+      <span className="ml-3 h-5 w-px bg-slate-700" aria-hidden="true" />
+
+      <button
+        type="button"
+        onClick={onToggleAside}
+        aria-label={asideVisible ? 'Скрыть список матчей' : 'Показать список матчей'}
+        aria-pressed={!asideVisible}
+        title={asideVisible ? 'Скрыть список матчей' : 'Показать список матчей'}
+        className="rounded p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+      >
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
     </nav>
   );
 }

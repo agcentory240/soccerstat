@@ -57,6 +57,7 @@ npm run docker:up           # требует AI_API_KEY в .env
 - pgAdmin: `http://localhost:5050`
 - RabbitMQ UI: `http://localhost:15672`
 - Redis: `localhost:6379`
+- Redis Insight: `http://localhost:5540`
 
 Рекомендуемая версия Node.js — **22 LTS**. На Node 20 основная сборка работает, но часть инструментов NestJS CLI 12 выдаёт предупреждения `EBADENGINE`.
 

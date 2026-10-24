@@ -12,6 +12,7 @@ import {
 } from '../ai/ai-prompts.js';
 import { ClientProxy } from '@nestjs/microservices';
 import { StateService } from '../state/state.service.js';
+import type { ServerStateMatchInfo } from '../state/state.types.js';
 
 @Injectable()
 export class MatchesAnalyzerService {
@@ -125,14 +126,23 @@ export class MatchesAnalyzerService {
       );
     }
 
-    // 8. Отправляем событие
+    // 8. Формируем список отобранных матчей для Redis/SSE (`matches_analized`)
+    const selectedInfo: ServerStateMatchInfo[] = candidates
+      .filter((c) => topMatches.some((s) => s.id === c.id))
+      .map((c) => this.toMatchInfo(c));
+
+    // 9. Отправляем событие в RabbitMQ (оркестрация) и Redis (фронтенд)
     this.client.emit('matches.analyzed', {
       total: candidates.length,
       selected: topMatches.length,
       topIds: topMatches.map((s) => s.id),
     });
 
-    await this.stateService.analyzingDone(candidates.length, topMatches.length);
+    await this.stateService.analyzingDone(
+      candidates.length,
+      topMatches.length,
+      selectedInfo,
+    );
 
     return { sent: candidates.length, selected: topMatches.length };
   }
@@ -225,7 +235,11 @@ export class MatchesAnalyzerService {
         deepReasoning: 'Недостаточно данных',
         deepAnalyzedAt: new Date(),
       });
-      await this.stateService.deepDone(matchId, 'ПРОПУСТИТЬ');
+      await this.stateService.deepDone(
+        matchId,
+        'ПРОПУСТИТЬ',
+        this.toMatchInfo(match),
+      );
       return null;
     }
 
@@ -250,10 +264,10 @@ ID матча: ${matchId}.
           { role: 'user', content: userPrompt },
         ],
         {
-          model: 'deepseek-v4-pro',       // ← Pro для глубокого анализа
+          model: 'deepseek-v4-flash',       // ← Pro для глубокого анализа
           temperature: 0.3,            // небольшая вариативность для reasoning
-          maxTokens: 16384,             // ответ ~2000-3000 токенов
-          thinking: true,              // ← thinking для сложного анализа
+          maxTokens: 8192,             // ответ ~2000-3000 токенов
+          thinking: false,              // ← thinking для сложного анализа
         },
       );
     } catch (err: any) {
@@ -272,7 +286,12 @@ ID матча: ${matchId}.
       `✅ Match ${matchId}: ${result.final_decision} (conf=${result.prediction?.confidence})`,
     );
 
-    await this.stateService.deepDone(matchId, result.final_decision ?? null);
+    // Событие `match_analize_complete` в Redis/SSE с информацией о матче
+    await this.stateService.deepDone(
+      matchId,
+      result.final_decision ?? null,
+      this.toMatchInfo(match),
+    );
 
     return result;
   }
@@ -366,6 +385,17 @@ ID матча: ${matchId}.
     const cleaned = ev.replace('%', '').replace('+', '').trim();
     const num = parseFloat(cleaned);
     return isNaN(num) ? null : num;
+  }
+
+  /** Краткая информация о матче для событий состояния. */
+  private toMatchInfo(match: MatchEntity): ServerStateMatchInfo {
+    return {
+      id: match.id,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      league: match.league,
+      url: match.url,
+    };
   }
 
   /**

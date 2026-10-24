@@ -8,6 +8,8 @@ import { JSDOM } from 'jsdom';
 import { join } from 'path';
 import { mkdirSync, writeFileSync } from 'fs';
 import { MatchesService } from '../matches/matches.service.js';
+import { StateService } from '../state/state.service.js';
+import type { ServerStateMatchInfo } from '../state/state.types.js';
 
 //Экстракты
 import { extractPredictedScore } from './helpers/extract-predicted-score.js';
@@ -37,7 +39,8 @@ export class NbBetParserDetailService {
 
   constructor(
     @Inject('MATCHES_SERVICE') private readonly client: ClientProxy,
-    private readonly matchesService: MatchesService
+    private readonly matchesService: MatchesService,
+    private readonly stateService: StateService,
   ) { }
 
   /**
@@ -347,6 +350,18 @@ export class NbBetParserDetailService {
     await this.matchesService.updateFields(match.id, {
       info: this.detail_match.info,
     });
+
+    const matchInfo: ServerStateMatchInfo = {
+      id: match.id,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      league: match.league,
+      url: match.url,
+    };
+
+    // Событие `match_parsed`: в RabbitMQ (запуск глубокого анализа) и Redis/SSE
+    this.client.emit('match.parsed', { matchId: match.id, match: matchInfo });
+    await this.stateService.detailParsed(matchInfo);
 
     return this.detail_match;
   }

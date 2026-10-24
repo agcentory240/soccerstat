@@ -23,28 +23,11 @@ export class MatchesController {
     return this.matchesService.findByDate(date);
   }
 
- @Post('analyze')
+  @Post('analyze')
   async analyze() {
     const count = await this.analyzer.analyzeUnprocessed();
     return { updated: count };
   }
-    
-
-  // @EventPattern('matches.parsed')
-  // async handleMatchesParsed(
-  //   @Payload() data: { count: number },
-  //   @Ctx() context: any,
-  // ) {
-  //   this.logger.log(`Получено событие: спарсено ${data.count} матчей`);
-
-  //   // Здесь можно запустить анализ, отправить уведомление и т.д.
-  //   const count = await this.analyzer.analyzeUnprocessed();
-    
-  //   // Подтверждаем обработку (если noAck: false)
-  //   const channel = context.getChannelRef();
-  //   const originalMsg = context.getMessage();
-  //   channel.ack(originalMsg);
-  // }
 
   @Get(':id/')
   async getDetails(@Param('id') id: string): Promise<MatchEntity> {

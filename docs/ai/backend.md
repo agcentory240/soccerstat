@@ -64,17 +64,21 @@ import { MatchesService } from './matches.service.js';
 
 - Очередь `matches_queue`, `durable: true`.
 - Клиент `MATCHES_SERVICE` инжектится как `@Inject('MATCHES_SERVICE')`.
-- События: `matches.parsed`, `matches.analyzed`.
-- Обработчик `@EventPattern('matches.parsed')` в контроллере закомментирован — если включаешь, не забудь `ack`.
+- Исходящие события: `matches.parsed`, `matches.analyzed`, `match.parsed`.
+- Обработчики событий — `MatchesPipelineController` (`app/src/nb-bet-parser-main/matches-pipeline.controller.ts`):
+  - `matches.parsed` → `MatchesAnalyzerService.analyzeUnprocessed()`;
+  - `matches.analyzed` → `NbBetParserDetailService.parseMatch()` для каждого `topId`, затем `StateService.allDone()`;
+  - `match.parsed` → `MatchesAnalyzerService.analyzeOneDeep()`.
+- Обработчики ловят ошибки и не пробрасывают их (только логируют), чтобы сообщение подтверждалось при `noAck: false`.
 
 ### `StateModule`
 
 Файлы — `app/src/state/`.
 
 - `state.config.ts` — `REDIS_URL` (по умолчанию `redis://localhost:6379`) и канал `STATE_CHANNEL = 'soccerstat:state'`.
-- `state.types.ts` — контракт `ServerStateEvent` (`type`, `status`, `stage`, `message`, `progress`, `updatedAt`). При изменении синхронизируй `frontend/src/types/state.ts`.
+- `state.types.ts` — контракт `ServerStateEvent` (`type`, `status`, `stage`, `message`, `progress`, `data`, `updatedAt`). Стадии: `parsing`, `parsed`, `analyzing`, `analyzed`, `detail-parsed`, `deep`, `deep-done`, `all-done`. Поле `data` (`ServerStateData`) несёт `count`, `total`, `selected`, список отобранных `matches` и инфо о конкретном `match`. При изменении синхронизируй `frontend/src/types/state.ts`.
 - `RedisService` — publisher и subscriber `ioredis`. Redis **не критичен**: при недоступности состояние доставляется локальным подписчикам, приложение не падает. `onModuleInit` не бросает исключений, ошибки только логируются.
-- `StateService` — единственная точка публикации: `parsingStart/Done`, `analyzingStart/Progress/Done`, `deepStart/Done`, `fail`, базовый `update(patch)`. Инжектится в `NbBetParserMainService` и `MatchesAnalyzerService`.
+- `StateService` — единственная точка публикации: `parsingStart/Done`, `analyzingStart/Progress/Done`, `detailParsed`, `deepStart/Done`, `allDone`, `fail`, базовый `update(patch)`. Инжектится в `NbBetParserMainService`, `NbBetParserDetailService`, `MatchesAnalyzerService` и `MatchesPipelineController`.
 - `StateController` — `@Sse()` на `GET /events`: первым сообщением снапшот, далее обновления и heartbeat каждые 15 с.
 
 Правило: не публикуй состояние напрямую в Redis из сервисов — используй `StateService`, чтобы формат события оставался единым.

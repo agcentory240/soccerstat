@@ -36,8 +36,8 @@ frontend/src/
 - `matches`, `loading`, `refreshing`, `error`;
 - `serverState`, `eventsConnected` — состояние сервера из SSE и статус соединения;
 - `loadMatches()` — `GET /matches`, сортировка (selected сверху, затем по дате), лимит 500;
-- `refreshAll()` — парсинг → анализ → повторная загрузка;
-- `connectEvents()` — открывает `EventSource` на `GET /events`, возвращает функцию отписки. Повторный вызов не создаёт новое соединение. При `status = done` на стадиях `parsed` / `analyzed` автоматически вызывает `loadMatches()`.
+- `refreshAll()` — парсинг списка → повторная загрузка. AI-анализ и парсинг деталей запускаются на бэкенде автоматически по цепочке событий RabbitMQ, вызывать `analyzeMatches()` вручную не нужно;
+- `connectEvents()` — открывает `EventSource` на `GET /events`, возвращает функцию отписки. Повторный вызов не создаёт новое соединение. При `status = done` на стадиях `parsed` / `analyzed` автоматически вызывает `loadMatches()`. Состояния `detail-parsed`, `deep-done`, `all-done` несут `data.match` / `data.matches` и используются для отображения прогресса.
 
 Правила:
 
@@ -83,6 +83,7 @@ frontend/src/
 - Стили: Tailwind-классы для компоновки; SCSS-модули — для специфичных компонентов.
 - Пользовательские тексты — на русском.
 - Markdown от AI рендери через `Markdown`-компонент, не вставляй HTML через `dangerouslySetInnerHTML`.
+- `TopMenu` содержит выпадающее меню «Сервис» (pgAdmin, RabbitMQ, Redis Insight, API) и кнопку-бутерброд, которая скрывает левый `aside` со списком матчей. Видимость `aside` хранится в `Layout` и передаётся через `Outlet context` (`LayoutContext`).
 
 Генерация заготовок: `vite-plugin-create`, конфиг `frontend/vite-create.config.json`, шаблоны в `frontend/templates/`. Каталог `templates/` исключён из ESLint, так как содержит плейсхолдеры `{{name}}`.
 

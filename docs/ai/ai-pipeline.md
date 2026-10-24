@@ -11,6 +11,11 @@
 Вызовы и сохранение — `app/src/matches/matches-analyzer.service.ts`.
 Транспорт и JSON-парсинг — `app/src/ai/ai.service.ts`.
 
+Запуск этапов — событийный (`app/src/nb-bet-parser-main/matches-pipeline.controller.ts`):
+`matches.parsed` → `analyzeUnprocessed()`, далее `matches.analyzed` → парсинг деталей,
+`match.parsed` → `analyzeOneDeep()`. HTTP-эндпоинты `POST /matches/analyze` и
+`GET /matches/:id/deep` остаются для ручного запуска этапов.
+
 ## 2. Быстрая оценка
 
 Вход: до 50 матчей с `aiScore IS NULL` и `score IS NULL`.

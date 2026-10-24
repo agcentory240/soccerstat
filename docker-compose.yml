@@ -87,6 +87,18 @@ services:
     networks:
       - app-network
 
+  # Админка Redis (веб-интерфейс)
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: soccer-redis-insight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
 # Определяем volume для данных
 volumes:
   postgres_data:

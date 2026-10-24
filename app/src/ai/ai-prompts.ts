@@ -83,18 +83,52 @@ export interface DeepAnalysisResult {
   final_decision: 'СТАВИТЬ' | 'ПРОПУСТИТЬ' | 'НАБЛЮДАТЬ';
   summary: string;
 }
+export interface TrendResonance {
+  market: string;
+  home_evidence: string;
+  away_evidence: string;
+  resonance_type: 'scoring_vs_conceding' | 'both_scoring' | 'both_conceding' | 'other';
+  combined_strength: number;  // 0-1
+  sample_size: number;
+}
+
+export interface DeepAnalysisPrediction {
+  main_bet: string;
+  coefficient: number;
+  confidence: number;
+  expected_value: string;
+  stake_recommendation: string;
+  has_statistical_anchor: boolean;      // 🆕
+  statistical_evidence: string | null;  // 🆕
+  trend_resonance: TrendResonance | null;  // 🆕
+}
+
+export interface DeepAnalysisAlternativeBet {
+  market: string;
+  coefficient: number;
+  confidence: number;
+  reason: string;
+  has_statistical_anchor: boolean;
+  statistical_evidence: string | null;
+  trend_resonance: TrendResonance | null;
+}
 
 export const DEEP_ANALYSIS_SYSTEM_PROMPT = `Ты — профессиональный аналитик футбольных ставок. 
-Проанализируй матч на основе предоставленных данных и верни решение в формате JSON.
+Проанализируй матч и найди **резонанс трендов** — ситуации, когда тренд одной команды подтверждается трендом другой.
 
-ВАЖНО:
-1. Опирайся ТОЛЬКО на данные из MD. Не выдумывай.
-2. Если данных недостаточно — ставь final_decision = "ПРОПУСТИТЬ".
-3. confidence — честная уверенность (0.0-1.0), не завышай.
-4. expected_value — рассчитай как (вероятность × коэф. - 1) × 100%.
-5. risks — обязательно 2-3 контр-аргумента.
+**ЧТО ТАКОЕ РЕЗОНАНС:**
+- Хозяева забивают в 1-м тайме (70% матчей) + Гости пропускают в 1-м тайме (65% матчей) = резонанс на «гол в 1-м тайме»
+- Хозяева не забивают (60%) + Гости не пропускают (55%) = резонанс на «ИТ1М 0.5»
+- Обе команды забивают (70% и 65%) = резонанс на «Обе забьют — Да»
 
-ФОРМАТ ОТВЕТА (только JSON, без markdown):
+**ПРАВИЛА:**
+1. Опирайся ТОЛЬКО на данные из MD. Не выдумывай тренды.
+2. Если данных недостаточно (меньше 3 трендов, нет статистики) — ставь final_decision = "ПРОПУСТИТЬ".
+3. Резонанс должен быть подтверждён **двумя независимыми источниками** (тренд хозяев + тренд гостей).
+4. Если резонанса нет — ставь final_decision = "ПРОПУСТИТЬ" или "НАБЛЮДАТЬ".
+5. confidence — честная уверенность (0.0-1.0), не завышай.
+
+**ФОРМАТ ОТВЕТА (только JSON, без markdown):**
 {
   "match_id": <id>,
   "match_info": {
@@ -108,23 +142,33 @@ export const DEEP_ANALYSIS_SYSTEM_PROMPT = `Ты — профессиональ�
     "coefficient": <коэф>,
     "confidence": <0-1>,
     "expected_value": "<+X%>",
-    "stake_recommendation": "<X% банка>"
+    "stake_recommendation": "<X% банка>",
+    "has_statistical_anchor": true/false,
+    "statistical_evidence": "<цитата тренда или null>",
+    "trend_resonance": {
+      "market": "<рынок>",
+      "home_evidence": "<тренд хозяев>",
+      "away_evidence": "<тренд гостей>",
+      "resonance_type": "scoring_vs_conceding" | "both_scoring" | "both_conceding" | "other",
+      "combined_strength": <0-1>,
+      "sample_size": <число матчей>
+    } | null
   },
   "alternative_bets": [
     {
       "market": "<рынок>",
       "coefficient": <коэф>,
       "confidence": <0-1>,
-      "reason": "<обоснование>"
+      "reason": "<обоснование>",
+      "has_statistical_anchor": true/false,
+      "statistical_evidence": "<цитата или null>",
+      "trend_resonance": {...} | null
     }
   ],
   "avoid": [
-    {
-      "market": "<рынок>",
-      "reason": "<почему НЕ ставить>"
-    }
+    { "market": "<рынок>", "reason": "<почему НЕ ставить>" }
   ],
-  "reasoning": "<2-4 предложения>",
+  "reasoning": "<2-4 предложения о резонансе>",
   "key_factors": ["<фактор 1>", "<фактор 2>"],
   "risks": ["<риск 1>", "<риск 2>"],
   "final_decision": "СТАВИТЬ" | "ПРОПУСТИТЬ" | "НАБЛЮДАТЬ",

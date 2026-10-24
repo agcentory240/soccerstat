@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { RedisService } from './redis.service.js';
-import type { ServerStateEvent, ServerStatePatch, ServerStateStage } from './state.types.js';
+import type {
+  ServerStateEvent,
+  ServerStateMatchInfo,
+  ServerStatePatch,
+  ServerStateStage,
+} from './state.types.js';
 
 /**
  * Единая точка публикации состояния сервера.
@@ -49,15 +54,18 @@ export class StateService {
       stage: 'parsing',
       message: 'Парсинг списка матчей…',
       progress: null,
+      data: undefined,
     });
   }
 
+  /** Событие `matches_parsed`: список матчей спарсен и сохранён в БД. */
   async parsingDone(count: number): Promise<void> {
     await this.update({
       status: 'done',
       stage: 'parsed',
       message: `Спарсено матчей: ${count}`,
       progress: null,
+      data: { count },
     });
   }
 
@@ -67,6 +75,7 @@ export class StateService {
       stage: 'analyzing',
       message: `AI-анализ ${total} матчей…`,
       progress: { processed: 0, total },
+      data: undefined,
     });
   }
 
@@ -76,15 +85,36 @@ export class StateService {
       stage: 'analyzing',
       message: `AI-анализ: ${processed} из ${total}`,
       progress: { processed, total },
+      data: undefined,
     });
   }
 
-  async analyzingDone(total: number, selected: number): Promise<void> {
+  /**
+   * Событие `matches_analized`: быстрый AI-анализ завершён.
+   * В `data.matches` передаётся список отобранных для глубокого анализа матчей.
+   */
+  async analyzingDone(
+    total: number,
+    selected: number,
+    matches?: ServerStateMatchInfo[],
+  ): Promise<void> {
     await this.update({
       status: 'done',
       stage: 'analyzed',
       message: `Оценено матчей: ${total}, отобрано: ${selected}`,
       progress: { processed: total, total },
+      data: { total, selected, matches },
+    });
+  }
+
+  /** Событие `match_parsed`: детальная информация по матчу спарсена. */
+  async detailParsed(match: ServerStateMatchInfo): Promise<void> {
+    await this.update({
+      status: 'done',
+      stage: 'detail-parsed',
+      message: `Спарсен матч #${match.id}: ${match.homeTeam} — ${match.awayTeam}`,
+      progress: null,
+      data: { match },
     });
   }
 
@@ -94,15 +124,36 @@ export class StateService {
       stage: 'deep',
       message: `Глубокий анализ матча #${matchId}…`,
       progress: null,
+      data: undefined,
     });
   }
 
-  async deepDone(matchId: number, decision: string | null): Promise<void> {
+  /**
+   * Событие `match_analize_complete`: глубокий анализ матча завершён,
+   * результат записан в БД.
+   */
+  async deepDone(
+    matchId: number,
+    decision: string | null,
+    match?: ServerStateMatchInfo,
+  ): Promise<void> {
     await this.update({
       status: 'done',
       stage: 'deep-done',
       message: `Матч #${matchId}: ${decision ?? 'решение не получено'}`,
       progress: null,
+      data: match ? { match: { ...match, decision } } : undefined,
+    });
+  }
+
+  /** Событие `all_matches_analized`: все отобранные матчи спарсены и проанализированы. */
+  async allDone(selected: number): Promise<void> {
+    await this.update({
+      status: 'done',
+      stage: 'all-done',
+      message: `Обработаны все отобранные матчи: ${selected}`,
+      progress: null,
+      data: { selected },
     });
   }
 
@@ -112,6 +163,7 @@ export class StateService {
       stage,
       message,
       progress: null,
+      data: undefined,
     });
   }
 }

@@ -16,8 +16,9 @@ PostgreSQL (matches)
    └──► Глубокий AI-анализ (deepseek-v4-pro) ──► deepAnalysis, finalDecision, mainBet, ...
 
 RabbitMQ (matches_queue)
-   ├── matches.parsed
-   └── matches.analyzed
+   ├── matches.parsed    → запуск быстрого AI-анализа
+   ├── matches.analyzed  → парсинг деталей отобранных матчей
+   └── match.parsed      → запуск глубокого AI-анализа
 
 Состояние операций
 NestJS StateService ──publish──► Redis (канал soccerstat:state)
@@ -43,7 +44,7 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 |---|---|
 | `AiModule` | Обёртка над OpenAI SDK для DeepSeek, JSON-парсинг ответов |
 | `MatchesModule` | Сущность, репозиторий, оценка и глубокий анализ |
-| `NbBetParserMainModule` | Парсинг списка матчей и деталей |
+| `NbBetParserMainModule` | Парсинг списка матчей и деталей, событийный оркестратор пайплайна (`MatchesPipelineController`) |
 | `RabbitmqModule` | Клиент для публикации событий |
 | `StateModule` | Состояние сервера: Redis pub/sub + SSE-поток для фронтенда |
 
@@ -67,6 +68,7 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 | `pgadmin` | 5050 | Админка БД |
 | `rabbitmq` | 5672 / 15672 | Очередь / Web UI |
 | `redis` | 6379 | Pub/sub состояния (канал `soccerstat:state`) |
+| `redis-insight` | 5540 | Веб-интерфейс Redis (Redis Insight) |
 
 ## 3. API-контракт
 
@@ -100,29 +102,43 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 
 ## 5. Потоки данных
 
-### Парсинг списка
+Пайплайн запускается одним действием пользователя (парсинг списка), дальше этапы
+связываются событиями RabbitMQ; состояния публикуются в Redis и доходят до фронтенда по SSE.
+
+### 1. Парсинг списка (`matches.parsed`)
 
 1. `GET /parser/matches` → `NbBetParserMainService.parseMatches()`.
 2. Playwright открывает `https://nb-bet.com/Results`, закрывает cookie-баннер.
 3. HTML сохраняется в `app/debug/` и разбирается через JSDOM.
 4. `MatchesService.saveMany()` делает upsert по `url`.
-5. Публикуется событие `matches.parsed`.
+5. В RabbitMQ публикуется `matches.parsed` (`{ count }`).
+6. В Redis/SSE публикуется состояние `stage = 'parsed'` с `data.count`.
 
-### Быстрый AI-анализ
+### 2. Быстрый AI-анализ (`matches.analyzed`)
 
-1. `POST /matches/analyze` → `MatchesAnalyzerService.analyzeUnprocessed()`.
-2. Берутся до 50 матчей с `aiScore IS NULL` и `score IS NULL`.
+1. `MatchesPipelineController.onMatchesParsed()` получает `matches.parsed`.
+2. `MatchesAnalyzerService.analyzeUnprocessed()` берёт до 50 матчей с `aiScore IS NULL` и `score IS NULL`.
 3. `deepseek-flash` возвращает JSON `{ matches: [{ id, score, reason, market }] }`.
 4. Оценки сохраняются; топ-10 с `score >= 6` получает `selected = true`.
-5. Публикуется `matches.analyzed`.
+5. В RabbitMQ публикуется `matches.analyzed` (`{ total, selected, topIds }`).
+6. В Redis/SSE публикуется `stage = 'analyzed'` с `data.matches` — списком отобранных матчей.
 
-### Глубокий анализ
+### 3. Парсинг деталей (`match.parsed`)
 
-1. `GET /matches/:id/deep`.
-2. Если `deepAnalyzed = true`, возвращается сохранённый `deepAnalysis`.
-3. Иначе собирается Markdown из `info` (или из полей матча).
-4. `deepseek-v4-pro` с `thinking: true` возвращает JSON-решение.
-5. Результат сохраняется в поля сущности и `deepAnalysis`.
+1. `MatchesPipelineController.onMatchesAnalyzed()` получает `matches.analyzed`.
+2. Для каждого `topId`: `NbBetParserDetailService.parseMatch()` собирает Markdown в `info`.
+3. После сохранения `info` в RabbitMQ публикуется `match.parsed` (`{ matchId, match }`).
+4. В Redis/SSE публикуется `stage = 'detail-parsed'` с `data.match`.
+5. После обработки всех отобранных матчей публикуется `stage = 'all-done'` (`all_matches_analized`).
+
+### 4. Глубокий анализ (`match_analize_complete`)
+
+1. `MatchesPipelineController.onMatchParsed()` получает `match.parsed`.
+2. `MatchesAnalyzerService.analyzeOneDeep(matchId)` собирает Markdown из `info`.
+3. `deepseek-v4-pro` возвращает JSON-решение, результат сохраняется в поля сущности и `deepAnalysis`.
+4. В Redis/SSE публикуется `stage = 'deep-done'` с `data.match` (включая `decision`).
+
+> `POST /matches/analyze` и `GET /matches/:id/deep` остаются для ручного запуска соответствующих этапов.
 
 ### Состояние сервера (Redis → SSE)
 
