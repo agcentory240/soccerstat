@@ -2,11 +2,17 @@ import { create } from 'zustand'
 import { fetchMatches, parseMatches } from '../api/matches'
 import { subscribeToServerState } from '../api/events'
 import type { Match } from '../types/match'
-import type { ServerStateEvent } from '../types/state'
+import type { ServerStateEvent, ServerStateLogEntry } from '../types/state'
 import { getErrorMessage } from '../utils/error'
 
 /** Активная подписка на SSE, чтобы не открывать соединение повторно. */
 let stopEvents: (() => void) | null = null
+
+/** Предел хранимых записей журнала Redis (кольцевой буфер). */
+const MAX_EVENT_LOGS = 300
+
+/** Монотонный счётчик для стабильных React-ключей записей журнала. */
+let logSeq = 0
 
 interface MatchesState {
   matches: Match[]
@@ -16,6 +22,7 @@ interface MatchesState {
 
   serverState: ServerStateEvent | null   // ← состояние сервера из Redis через SSE
   eventsConnected: boolean
+  eventLogs: ServerStateLogEntry[]       // ← накопленный журнал событий Redis
 
   loadMatches: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
@@ -29,6 +36,7 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
   error: null,
   serverState: null,
   eventsConnected: false,
+  eventLogs: [],
 
   loadMatches: async () => {
     if (get().loading) return
@@ -67,7 +75,20 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
 
     stopEvents = subscribeToServerState({
       onState: (state) => {
-        set({ serverState: state })
+        // Копим журнал событий независимо от видимости панели логов.
+        set((prev) => ({
+          serverState: state,
+          eventLogs: [
+            ...prev.eventLogs,
+            {
+              id: ++logSeq,
+              at: state.updatedAt,
+              status: state.status,
+              stage: state.stage,
+              message: state.message,
+            },
+          ].slice(-MAX_EVENT_LOGS),
+        }))
 
         // Первое сообщение — снапшот при подключении, список уже загружен страницей.
         if (isFirstMessage) {

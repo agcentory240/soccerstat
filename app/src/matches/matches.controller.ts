@@ -25,8 +25,8 @@ export class MatchesController {
 
   @Post('analyze')
   async analyze() {
-    const count = await this.analyzer.analyzeUnprocessed();
-    return { updated: count };
+    const result = await this.analyzer.analyzeUnprocessed();
+    return { updated: result.sent, selected: result.selected };
   }
 
   @Get(':id/')

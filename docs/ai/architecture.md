@@ -77,7 +77,7 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 | `GET` | `/matches` | Матчи с `aiScore > 3`, сортировка по `dateTime ASC` |
 | `GET` | `/matches/by-date?date=YYYY-MM-DD` | Матчи за дату |
 | `GET` | `/matches/:id` | Полная сущность матча |
-| `POST` | `/matches/analyze` | Оценить до 50 неоценённых матчей |
+| `POST` | `/matches/analyze` | Оценить все неоценённые матчи (пачками по 50) |
 | `GET` | `/matches/:id/deep` | Глубокий анализ одного матча |
 | `GET` | `/parser/matches` | Спарсить список матчей |
 | `GET` | `/parser/matches/:id` | Спарсить детали матча по `url` |
@@ -117,7 +117,7 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 ### 2. Быстрый AI-анализ (`matches.analyzed`)
 
 1. `MatchesPipelineController.onMatchesParsed()` получает `matches.parsed`.
-2. `MatchesAnalyzerService.analyzeUnprocessed()` берёт до 50 матчей с `aiScore IS NULL` и `score IS NULL`.
+2. `MatchesAnalyzerService.analyzeUnprocessed()` берёт все матчи с `aiScore IS NULL` и `score IS NULL` и оценивает их пачками по 50 (`BATCH_SIZE`), пока выборка не опустеет.
 3. `deepseek-flash` возвращает JSON `{ matches: [{ id, score, reason, market }] }`.
 4. Оценки сохраняются; топ-10 с `score >= 6` получает `selected = true`.
 5. В RabbitMQ публикуется `matches.analyzed` (`{ total, selected, topIds }`).

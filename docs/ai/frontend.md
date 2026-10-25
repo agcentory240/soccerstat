@@ -9,7 +9,7 @@
 ```text
 frontend/src/
 ├── api/           # HTTP-клиент (matches.ts) и SSE-подписка (events.ts)
-├── components/    # Layout, MatchCard, MatchList, MatchDetails, Markdown, TopMenu
+├── components/    # Layout, MatchCard, MatchList, MatchDetails, Markdown, TopMenu, RedisLogPanel
 ├── hooks/         # useMatch
 ├── pages/         # MatchesPage
 ├── store/         # useMatchesStore (Zustand)
@@ -35,9 +35,19 @@ frontend/src/
 
 - `matches`, `loading`, `refreshing`, `error`;
 - `serverState`, `eventsConnected` — состояние сервера из SSE и статус соединения;
+- `eventLogs` — журнал событий Redis (`ServerStateLogEntry[]`, кольцевой буфер на 300 записей), пополняется при каждом SSE-событии;
 - `loadMatches()` — `GET /matches`, сортировка (selected сверху, затем по дате), лимит 500;
 - `refreshAll()` — парсинг списка → повторная загрузка. AI-анализ и парсинг деталей запускаются на бэкенде автоматически по цепочке событий RabbitMQ, вызывать `analyzeMatches()` вручную не нужно;
 - `connectEvents()` — открывает `EventSource` на `GET /events`, возвращает функцию отписки. Повторный вызов не создаёт новое соединение. При `status = done` на стадиях `parsed` / `analyzed` автоматически вызывает `loadMatches()`. Состояния `detail-parsed`, `deep-done`, `all-done` несут `data.match` / `data.matches` и используются для отображения прогресса.
+- Подписка `connectEvents()` запускается в `Layout` (а не в `MatchesPage`), чтобы SSE жил всё время работы приложения и не зависел от текущей страницы.
+
+### Панель логов Redis
+
+`components/RedisLogPanel` — правая колонка с журналом событий из Redis (SSE).
+
+- Компонент всегда смонтирован в `Layout`; видимость переключается через проп `visible` (класс `hidden`), поэтому при скрытии подписка и накопление записей не прекращаются.
+- Список компактный (`text-[11px] font-mono`), с дататаймом `ДД.ММ ЧЧ:ММ:СС`, стадией и сообщением; контейнер скроллируемый (`overflow-y-auto`).
+- Автопрокрутка вниз при новых записях, пока пользователь находится у нижнего края.
 
 Правила:
 

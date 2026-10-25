@@ -7,6 +7,7 @@ import { AiService } from '../ai/ai.service.js';
 import {
   MATCH_FILTER_SYSTEM_PROMPT,
   MatchSelectionResult,
+  ScoredMatch,
   DeepAnalysisResult,
   DEEP_ANALYSIS_SYSTEM_PROMPT,
 } from '../ai/ai-prompts.js';
@@ -17,7 +18,12 @@ import type { ServerStateMatchInfo } from '../state/state.types.js';
 @Injectable()
 export class MatchesAnalyzerService {
   private readonly logger = new Logger(MatchesAnalyzerService.name);
+  /** Размер пачки матчей в одном запросе к AI (ограничение контекста и стоимости). */
   private readonly BATCH_SIZE = 50;
+  /** Предохранитель от бесконечного цикла: максимум пачек за один запуск. */
+  private readonly MAX_BATCHES = 40;
+  /** Размер чанка для bulk-update по id (лимит параметров SQL-запроса). */
+  private readonly UPDATE_CHUNK_SIZE = 500;
   private readonly MIN_SCORE_THRESHOLD = 6;  // порог для selected
   private readonly TOP_N = 10;               // максимум выбранных
 
@@ -29,18 +35,26 @@ export class MatchesAnalyzerService {
     private readonly stateService: StateService,
   ) { }
 
+  /**
+   * Быстрая оценка ВСЕХ неоценённых предстоящих матчей.
+   *
+   * Матчи уходят в AI пачками по `BATCH_SIZE` (ограничение контекста и стоимости
+   * одного запроса), но цикл продолжается до опустошения выборки
+   * `aiScore IS NULL AND score IS NULL`. Поэтому оценивается весь список,
+   * а не только первые 50 записей.
+   *
+   * Топ-N для глубокого анализа выбирается глобально по всем оценкам,
+   * а не внутри каждой пачки.
+   */
   async analyzeUnprocessed(): Promise<{ sent: number; selected: number }> {
-    // 1. Берём матчи, которые ещё НЕ оценены ИИ
-    const candidates = await this.repo.find({
-      where: {
-        aiScore: IsNull(),        // ← ключевое: нет оценки
-        score: IsNull(),          // матч ещё не сыгран
-      },
-      order: { dateTime: 'ASC' },
-      take: this.BATCH_SIZE,
-    });
+    const where = {
+      aiScore: IsNull(),        // ← ключевое: нет оценки
+      score: IsNull(),          // матч ещё не сыгран
+    };
 
-    if (candidates.length === 0) {
+    const total = await this.repo.count({ where });
+
+    if (total === 0) {
       this.logger.log('No matches to analyze');
       await this.stateService.update({
         status: 'idle',
@@ -51,10 +65,114 @@ export class MatchesAnalyzerService {
       return { sent: 0, selected: 0 };
     }
 
-    this.logger.log(`Sending ${candidates.length} matches to AI`);
-    await this.stateService.analyzingStart(candidates.length);
+    this.logger.log(
+      `Sending ${total} matches to AI (пачки по ${this.BATCH_SIZE})`,
+    );
+    await this.stateService.analyzingStart(total);
 
-    // 2. Компактный список для AI
+    const allCandidates: MatchEntity[] = [];
+    const allScored: ScoredMatch[] = [];
+    const handledIds = new Set<number>();
+    let processed = 0;
+
+    // 1. Оцениваем все матчи пачками, пока выборка не опустеет
+    for (let batchIndex = 0; batchIndex < this.MAX_BATCHES; batchIndex++) {
+      const batch = await this.repo.find({
+        where,
+        order: { dateTime: 'ASC' },
+        take: this.BATCH_SIZE,
+      });
+
+      if (batch.length === 0) break;
+
+      // Страховка от зацикливания: если выборка не сдвинулась,
+      // значит оценки не сохранились — прерываемся.
+      const fresh = batch.filter((m) => !handledIds.has(m.id));
+      if (fresh.length === 0) {
+        this.logger.warn(
+          'Выборка неоценённых матчей не изменилась — прерываю AI-анализ',
+        );
+        break;
+      }
+
+      const scored = await this.scoreBatch(fresh);
+      await this.saveScores(scored, fresh);
+
+      for (const match of fresh) handledIds.add(match.id);
+      allCandidates.push(...fresh);
+      allScored.push(...scored);
+      processed += fresh.length;
+
+      this.logger.log(`AI-анализ: обработано ${processed} из ${total}`);
+      await this.stateService.analyzingProgress(processed, total);
+    }
+
+    if (processed < total) {
+      this.logger.warn(
+        `Оценено ${processed} из ${total} матчей: достигнут предохранитель ${this.MAX_BATCHES} пачек`,
+      );
+    }
+
+    // 2. Глобальный топ-N по всем оценкам
+    const topMatches = allScored
+      .filter((s) => s.score >= this.MIN_SCORE_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, this.TOP_N);
+
+    this.logger.log(
+      `📊 Топ-${topMatches.length} матчей (score >= ${this.MIN_SCORE_THRESHOLD})`,
+    );
+
+    const topIds = new Set(topMatches.map((s) => s.id));
+
+    // 3. Помечаем топ как selected
+    if (topIds.size > 0) {
+      await this.repo.update(
+        { id: In([...topIds]) },
+        { selected: true, marked: true },
+      );
+    }
+
+    // 4. Остальные оценённые матчи — marked, но не selected
+    const nonSelectedIds = allCandidates
+      .filter((c) => !topIds.has(c.id))
+      .map((c) => c.id);
+
+    for (const chunk of this.chunk(nonSelectedIds, this.UPDATE_CHUNK_SIZE)) {
+      await this.repo.update(
+        { id: In(chunk) },
+        { marked: true, selected: false },
+      );
+    }
+
+    // 5. Формируем список отобранных матчей для Redis/SSE (`matches_analized`)
+    const selectedInfo: ServerStateMatchInfo[] = allCandidates
+      .filter((c) => topIds.has(c.id))
+      .map((c) => this.toMatchInfo(c));
+
+    // 6. Отправляем событие в RabbitMQ (оркестрация) и Redis (фронтенд)
+    this.client.emit('matches.analyzed', {
+      total: allCandidates.length,
+      selected: topMatches.length,
+      topIds: [...topIds],
+    });
+
+    await this.stateService.analyzingDone(
+      allCandidates.length,
+      topMatches.length,
+      selectedInfo,
+    );
+
+    return { sent: allCandidates.length, selected: topMatches.length };
+  }
+
+  /**
+   * Оценка одной пачки матчей быстрой AI-моделью.
+   * Возвращает только матчи, которые модель включила в ответ
+   * (отсутствующие трактуются как score = 0 в `saveScores`).
+   */
+  private async scoreBatch(candidates: MatchEntity[]): Promise<ScoredMatch[]> {
+    // Компактный список для AI
     const compactList = candidates.map((m) => ({
       id: m.id,
       c: m.country,
@@ -66,12 +184,10 @@ export class MatchesAnalyzerService {
       i: m.info ?? undefined,
     }));
 
-    // 3. Отправляем в AI
     const userPrompt = `Оцени каждый матч по шкале 0-10. Верни JSON со всеми матчами.\n\n${JSON.stringify(compactList)}`;
 
-    let result: MatchSelectionResult;
     try {
-      result = await this.aiService.chatJson<MatchSelectionResult>(
+      const result = await this.aiService.chatJson<MatchSelectionResult>(
         [
           { role: 'system', content: MATCH_FILTER_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
@@ -83,68 +199,24 @@ export class MatchesAnalyzerService {
           thinking: false,
         },
       );
+
+      const scored = result?.matches ?? [];
+      this.logger.log(`AI scored ${scored.length} of ${candidates.length}`);
+      return scored;
     } catch (err: any) {
       this.logger.error(`AI request failed: ${err.message}`);
       await this.stateService.fail('analyzing', `Ошибка AI-анализа: ${err.message}`);
       throw err;
     }
+  }
 
-    const scored = result?.matches ?? [];
-    this.logger.log(`AI scored ${scored.length} of ${candidates.length}`);
-
-    // 4. Сохраняем оценки для ВСЕХ матчей
-    await this.saveScores(scored, candidates);
-
-    // 5. Выбираем топ-N по score >= порога
-    const topMatches = scored
-      .filter((s) => s.score >= this.MIN_SCORE_THRESHOLD)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, this.TOP_N);
-
-    this.logger.log(
-      `📊 Топ-${topMatches.length} матчей (score >= ${this.MIN_SCORE_THRESHOLD})`,
-    );
-
-    // 6. Помечаем топ как selected
-    if (topMatches.length > 0) {
-      const topIds = topMatches.map((s) => s.id);
-      await this.repo.update(
-        { id: In(topIds) },
-        { selected: true, marked: true },
-      );
+  /** Разбиение массива на чанки заданного размера. */
+  private chunk<T>(items: T[], size: number): T[][] {
+    const result: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+      result.push(items.slice(i, i + size));
     }
-
-    // 7. Помечаем остальные как marked (но не selected)
-    const allIds = candidates.map((c) => c.id);
-    const nonSelectedIds = allIds.filter(
-      (id) => !topMatches.some((s) => s.id === id),
-    );
-    if (nonSelectedIds.length > 0) {
-      await this.repo.update(
-        { id: In(nonSelectedIds) },
-        { marked: true, selected: false },
-      );
-    }
-
-    // 8. Формируем список отобранных матчей для Redis/SSE (`matches_analized`)
-    const selectedInfo: ServerStateMatchInfo[] = candidates
-      .filter((c) => topMatches.some((s) => s.id === c.id))
-      .map((c) => this.toMatchInfo(c));
-
-    // 9. Отправляем событие в RabbitMQ (оркестрация) и Redis (фронтенд)
-    this.client.emit('matches.analyzed', {
-      total: candidates.length,
-      selected: topMatches.length,
-      topIds: topMatches.map((s) => s.id),
-    });
-
-    await this.stateService.analyzingDone(
-      candidates.length,
-      topMatches.length,
-      selectedInfo,
-    );
-
-    return { sent: candidates.length, selected: topMatches.length };
+    return result;
   }
 
   /**

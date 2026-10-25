@@ -7,16 +7,26 @@ interface MatchCardProps {
 
 export function MatchCard({ match }: MatchCardProps) {
   return (
-    <Link to={`/prognoses/${match.id}`}>
-      <div
-        className={`
-        p-3 rounded-lg border cursor-pointer transition
+    <div
+      className={`
+        relative p-3 rounded-lg border cursor-pointer transition
         ${match.selected
-            ? 'bg-emerald-950/40 border-emerald-700 hover:bg-emerald-950/60'
-            : 'bg-slate-900 border-slate-800 hover:bg-slate-800'
-          }
+          ? 'bg-emerald-950/40 border-emerald-700 hover:bg-emerald-950/60'
+          : 'bg-slate-900 border-slate-800 hover:bg-slate-800'
+        }
       `}
-      >
+    >
+      {/*
+        Растянутая ссылка на страницу прогноза: покрывает всю карточку,
+        но не вкладывает в себя внешнюю ссылку nb-bet (вложенные <a> запрещены).
+      */}
+      <Link
+        to={`/prognoses/${match.id}`}
+        aria-label={`Открыть прогноз: ${match.homeTeam} — ${match.awayTeam}`}
+        className="absolute inset-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500"
+      />
+
+      <div className="relative z-10 pointer-events-none">
         <div className="text-xs text-slate-400 mb-1">
           {match.country} · {match.league}
         </div>
@@ -56,19 +66,19 @@ export function MatchCard({ match }: MatchCardProps) {
             </span>
           </div>
         )}
+      </div>
 
-
+      {match.url && (
         <a
           href={match.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="inline-block mt-2 text-xs text-emerald-400 hover:text-emerald-300 underline"
+          className="relative z-20 inline-block mt-2 text-xs text-emerald-400 hover:text-emerald-300 underline"
         >
           Открыть на nb-bet →
         </a>
-      </div>
-    </Link>
+      )}
+    </div>
   );
 }
 

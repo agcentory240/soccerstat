@@ -34,8 +34,8 @@ import { MatchesService } from './matches.service.js';
 
 `MatchesAnalyzerService`:
 
-- `BATCH_SIZE = 50`, `MIN_SCORE_THRESHOLD = 6`, `TOP_N = 10`;
-- `analyzeUnprocessed()` — быстрая оценка пачки, сохранение `aiScore`/`aiReason`/`aiMarket`, выставление `selected`/`marked`;
+- `BATCH_SIZE = 50` — размер пачки в одном запросе к AI, `MAX_BATCHES = 40` — предохранитель от бесконечного цикла, `UPDATE_CHUNK_SIZE = 500` — чанк для bulk-update, `MIN_SCORE_THRESHOLD = 6`, `TOP_N = 10`;
+- `analyzeUnprocessed()` — оценивает **все** неоценённые матчи пачками по `BATCH_SIZE` (цикл до опустошения выборки), сохраняет `aiScore`/`aiReason`/`aiMarket`, затем глобально выбирает топ-N и выставляет `selected`/`marked`;
 - `analyzeOneDeep(id)` — глубокий анализ, пропускает уже обработанные матчи;
 - `buildMatchMd()` — Markdown из полей, если `info` пуст;
 - `saveDeepAnalysis()` — раскладывает JSON в колонки + `deepAnalysis`.

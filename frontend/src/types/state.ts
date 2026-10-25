@@ -52,6 +52,20 @@ export interface ServerStateEvent {
   data?: ServerStateData;
 }
 
+/**
+ * Запись журнала событий Redis, накапливаемая на клиенте.
+ * Источник — SSE-поток `GET /events` (канал `soccerstat:state`).
+ */
+export interface ServerStateLogEntry {
+  /** Монотонный идентификатор записи для React-ключа. */
+  id: number;
+  /** ISO-дататайм события (`updatedAt`). */
+  at: string;
+  status: ServerStateStatus;
+  stage: ServerStateStage | null;
+  message: string;
+}
+
 /** Служебный heartbeat, чтобы соединение не закрывалось прокси. */
 export interface ServerStatePing {
   type: 'ping';

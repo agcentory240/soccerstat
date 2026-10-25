@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TopMenu } from '../TopMenu/TopMenu';
 import { RedisLogPanel } from '../RedisLogPanel';
 import { Outlet } from 'react-router-dom';
+import { useMatchesStore } from '../../store/useMatchesStore';
 
 export function Layout() {
   const [logPanelVisible, setLogPanelVisible] = useState(true);
+  const connectEvents = useMatchesStore((s) => s.connectEvents);
+
+  // SSE-подписка на Redis живёт всё время работы приложения:
+  // независимо от текущей страницы и видимости панели логов.
+  useEffect(() => connectEvents(), [connectEvents]);
 
   return (
     <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
@@ -16,7 +22,7 @@ export function Layout() {
         <main className="flex-1 min-w-0 min-h-0 overflow-hidden">
           <Outlet />
         </main>
-        {logPanelVisible && <RedisLogPanel />}
+        <RedisLogPanel visible={logPanelVisible} />
       </div>
     </div>
   );
