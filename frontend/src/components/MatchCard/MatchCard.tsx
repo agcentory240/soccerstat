@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { Match } from '../../types/match';
+import type { FinalDecision, Match } from '../../types/match';
 
 interface MatchCardProps {
   match: Match;
@@ -7,6 +7,8 @@ interface MatchCardProps {
 }
 
 export function MatchCard({ match,active }: MatchCardProps) {
+  const confidencePct = formatConfidence(match.confidence);
+
   return (
     <div
       className={`
@@ -76,6 +78,34 @@ export function MatchCard({ match,active }: MatchCardProps) {
             </span>
           </div>
         )}
+
+        {match.mainBet && (
+          <div
+            className={`mt-2 p-2 rounded border text-xs ${decisionCardStyle(match.finalDecision)}`}
+          >
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {match.finalDecision && (
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${decisionBadgeStyle(match.finalDecision)}`}
+                >
+                  {match.finalDecision}
+                </span>
+              )}
+              <span className="font-semibold text-white">{match.mainBet}</span>
+              {match.betCoefficient && (
+                <span className="text-slate-300">× {match.betCoefficient}</span>
+              )}
+              {confidencePct !== null && (
+                <span className="text-slate-400">Уверенность: {confidencePct}%</span>
+              )}
+            </div>
+            {match.stakeRecommendation && (
+              <div className="text-[11px] text-slate-400 mt-1">
+                Банк: {match.stakeRecommendation}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {match.url && (
@@ -90,6 +120,46 @@ export function MatchCard({ match,active }: MatchCardProps) {
       )}
     </div>
   );
+}
+
+/** Фон/рамка блока рекомендуемой ставки в зависимости от решения Pro-модели. */
+function decisionCardStyle(decision: FinalDecision | null): string {
+  switch (decision) {
+    case 'СТАВИТЬ':
+      return 'bg-green-950/40 border-green-700';
+    case 'НАБЛЮДАТЬ':
+      return 'bg-yellow-950/40 border-yellow-700';
+    case 'ПРОПУСТИТЬ':
+      return 'bg-red-950/40 border-red-800';
+    default:
+      return 'bg-indigo-950/40 border-indigo-700';
+  }
+}
+
+/** Цвет бейджа с решением Pro-модели. */
+function decisionBadgeStyle(decision: FinalDecision | null): string {
+  switch (decision) {
+    case 'СТАВИТЬ':
+      return 'bg-green-700 text-white';
+    case 'НАБЛЮДАТЬ':
+      return 'bg-yellow-700 text-white';
+    case 'ПРОПУСТИТЬ':
+      return 'bg-red-700 text-white';
+    default:
+      return 'bg-indigo-700 text-white';
+  }
+}
+
+/**
+ * Уверенность приходит строкой. В БД она хранится как доля (0–1),
+ * но на всякий случай поддерживаем и уже переведённые проценты.
+ */
+function formatConfidence(value: string | null): number | null {
+  if (!value) return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  const pct = num <= 1 ? num * 100 : num;
+  return Math.round(pct);
 }
 
 function OddBadge({ label, value }: { label: string; value: string | null }) {
