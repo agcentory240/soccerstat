@@ -1,3 +1,4 @@
+import { useParams } from 'react-router-dom';
 import type { Match } from '../../types/match';
 import { MatchCard } from '../MatchCard/MatchCard';
 
@@ -8,6 +9,10 @@ interface MatchListProps {
 }
 
 export function MatchList({ matches, loading, error }: MatchListProps) {
+
+  const { id } = useParams<{ id: string }>()
+
+  
   if (loading) {
     return <div className="p-4 text-slate-400 text-sm">Загрузка матчей...</div>;
   }
@@ -30,7 +35,7 @@ export function MatchList({ matches, loading, error }: MatchListProps) {
       {/* Список — скроллящийся */}
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto p-3 space-y-2 gap-1">
         {matches.map((match) => (
-          <MatchCard key={match.id} match={match} />
+          <MatchCard key={match.id} match={match} active={match.id === parseInt(id?id:'0')}/>
         ))}
       </div>
     </div>

@@ -3,9 +3,10 @@ import type { Match } from '../../types/match';
 
 interface MatchCardProps {
   match: Match;
+  active: boolean;
 }
 
-export function MatchCard({ match }: MatchCardProps) {
+export function MatchCard({ match,active }: MatchCardProps) {
   return (
     <div
       className={`
@@ -14,6 +15,10 @@ export function MatchCard({ match }: MatchCardProps) {
           ? 'bg-emerald-950/40 border-emerald-700 hover:bg-emerald-950/60'
           : 'bg-slate-900 border-slate-800 hover:bg-slate-800'
         }
+        ${active
+          ? 'bg-lime-950/40 border-lime-700 hover:bg-lime-950/60'
+          : ''
+        }        
       `}
     >
       {/*
