@@ -31,8 +31,18 @@ export class NbBetParserMainController {
         
     }
 
-    @Get('checkBet')
-    async checkBet(): Promise<void> {
+    @Get('checkbets')
+    async checkBets(): Promise<void> {
         await this.parserDetailService.parseMatchesScore();
+    }
+
+    @Get('checkbet/:id')
+    async checkBet(@Param('id') id: string): Promise<any> {
+        const match = await this.matchesService.findOne(Number(id));
+        if (match) {
+            return this.parserDetailService.parseMatchScore(match);
+        } else {
+            return new Promise((reject)=>{reject("No match found")})
+        }        
     }
 }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { FinalDecision, Match } from '../../types/match';
+import { formatMatchDateTime } from '../../utils/dateTime';
 
 interface MatchCardProps {
   match: Match;
@@ -45,7 +46,7 @@ export function MatchCard({ match,active }: MatchCardProps) {
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-          <span>{formatDateTime(match.dateTime)}</span>
+          <span>{formatMatchDateTime(match.dateTime, { withYear: false })}</span>
           {match.liveTime && match.status !== 'finished' && (
             <span className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold">
               {match.liveTime}
@@ -186,10 +187,4 @@ function OddBadge({ label, value }: { label: string; value: string | null }) {
       <span className="text-slate-500">{label}</span> {value}
     </span>
   );
-}
-
-function formatDateTime(dateTime: string): string {
-  const d = new Date(dateTime);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

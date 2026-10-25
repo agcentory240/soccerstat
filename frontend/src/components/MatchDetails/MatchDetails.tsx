@@ -3,8 +3,9 @@ import { useParams } from 'react-router-dom';
 import { useMatch } from '../../hooks/useMatch';
 import { Markdown } from '../Markdown/Markdown';
 import { useState } from 'react';
-import { analizeMatchDetails, parseMatchDetails } from '../../api/matches';
+import { analizeMatchDetails, parseMatchDetails, parseMatchScore } from '../../api/matches';
 import { getErrorMessage } from '../../utils/error';
+import { formatMatchDateTime } from '../../utils/dateTime';
 import type {
   DeepAnalysis,
   DeepAnalysisAlternativeBet,
@@ -33,6 +34,12 @@ export function MatchDetails() {
     }
   }
 
+  const handleCheckScore = async () => {
+    if (!id || parsing) return
+    await parseMatchScore(id)
+    await refetch()
+  }
+
   if (loading) {
     return <div className="p-6 text-slate-400">Загрузка матча...</div>;
   }
@@ -47,36 +54,60 @@ export function MatchDetails() {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-bold text-emerald-400 mb-2">
-        {match.homeTeam} — {match.awayTeam}
-      </h2>
-      <p className="text-slate-400 mb-4">
-        {match.country} · {match.league}
-      </p>
 
-      {/* Кнопка "Сделать прогноз" */}
-      <div className="mb-4">
-        <button
-          onClick={handleMakePrediction}
-          disabled={parsing}
-          className="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 
-                     text-white text-sm font-medium transition
-                     disabled:opacity-60 disabled:cursor-not-allowed
-                     flex items-center gap-2"
-        >
-          {parsing && (
-            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-          )}
-          {parsing ? 'Парсинг деталей...' : 'Сделать прогноз'}
-        </button>
-        {parseError && (
-          <p className="text-sm text-red-400 mt-2">Ошибка: {parseError}</p>
-        )}
+      <div className="flex flex-row justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-emerald-400 mb-2">
+            {match.homeTeam} — {match.awayTeam}
+          </h2>
+          <p className="text-slate-400 mb-4">
+            {match.country} · {match.league}
+          </p>
+        </div>
+
+        <div className="flex flex-row gap-2">
+          {/* Кнопка "Сделать прогноз" */}
+          <div className="mb-4">
+            <button
+              onClick={handleCheckScore}
+              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 
+                        text-white text-sm font-medium transition
+                        disabled:opacity-60 disabled:cursor-not-allowed
+                        flex items-center gap-2 cursor-pointer"
+            >
+              Проверить ставку
+            </button>
+          </div>
+
+          {/* Кнопка "Сделать прогноз" */}
+          <div className="mb-4">
+            <button
+              onClick={handleMakePrediction}
+              disabled={parsing}
+              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 
+                        text-white text-sm font-medium transition
+                        disabled:opacity-60 disabled:cursor-not-allowed
+                        flex items-center gap-2 cursor-pointer"
+            >
+              {parsing && (
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              )}
+              {parsing ? 'Парсинг деталей...' : 'Собрать данные'}
+            </button>
+            {parseError && (
+              <p className="text-sm text-red-400 mt-2">Ошибка: {parseError}</p>
+            )}
+          </div>
+        </div>
       </div>
+
+
+
 
       <div className="space-y-2 text-sm">
         <div className="text-slate-300">
-          <span className="text-slate-500">Дата:</span> {match.dateTime}
+          <span className="text-slate-500">Дата:</span>{' '}
+          {formatMatchDateTime(match.dateTime)}
         </div>
         {match.score && (
           <div className="text-slate-300">

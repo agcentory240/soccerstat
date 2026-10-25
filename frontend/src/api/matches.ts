@@ -27,8 +27,14 @@ export async function parseMatchDetails(id: string | number) {
   if (!res.ok) throw new Error('Ошибка парсинга деталей матча')
   return res.json()
 }
+
 export async function analizeMatchDetails(id: string | number) {
   const res = await fetch(`http://localhost:3000/matches/${id}/deep`)
   if (!res.ok) throw new Error('Ошибка парсинга деталей матча')
+  return res.json()
+}
+export async function parseMatchScore(id: string | number) {
+  const res = await fetch(`http://localhost:3000/parser/checkbet/${id}`)
+  if (!res.ok) throw new Error('Ошибка парсинга счета матча')
   return res.json()
 }
