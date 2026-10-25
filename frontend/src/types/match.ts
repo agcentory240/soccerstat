@@ -52,7 +52,8 @@ export interface Match {
 
   createdAt: string;
 
-  betStatus: boolean;
+  /** `true` — ставка сыграла, `false` — нет, `null` — проверка ещё не выполнялась. */
+  betStatus: boolean | null;
   matchArchive: boolean;
 }
 

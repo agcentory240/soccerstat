@@ -125,8 +125,8 @@ export class MatchEntity {
   @Column({ type: 'timestamp', nullable: true })
   deepAnalyzedAt: Date | null;
   
-  @Column({ type: 'boolean', default: false })
-  betStatus: boolean;  // сыграла ли ставка или нет
+  @Column({ type: 'boolean', nullable: true })
+  betStatus: boolean | null;  // сыграла ли ставка; null — проверка не выполнялась
 
   @Column({ type: 'boolean', default: false })
   matchArchive: boolean;  // Матч в архиве

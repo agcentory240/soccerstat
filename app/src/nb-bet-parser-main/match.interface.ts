@@ -29,7 +29,8 @@ export interface Match {
   selected?: boolean;
   info?: string | null;
   reason?: string | null;
-  betStatus?: boolean;
+  /** `true` — ставка сыграла, `false` — нет, `null` — ещё не проверялась. */
+  betStatus?: boolean | null;
   matchArchive?: boolean;
 }
 

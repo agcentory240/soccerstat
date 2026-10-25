@@ -9,6 +9,12 @@ interface MatchCardProps {
 export function MatchCard({ match,active }: MatchCardProps) {
   const confidencePct = formatConfidence(match.confidence);
 
+  /*
+    `betStatus === null` — проверка ставки ещё не выполнялась,
+    `true`/`false` — проверка сделана по финальному счёту.
+  */
+  const betChecked = match.betStatus !== null;
+
   return (
     <div
       className={`
@@ -102,6 +108,17 @@ export function MatchCard({ match,active }: MatchCardProps) {
             {match.stakeRecommendation && (
               <div className="text-[11px] text-slate-400 mt-1">
                 Банк: {match.stakeRecommendation}
+              </div>
+            )}
+            {betChecked && (
+              <div
+                className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  match.betStatus
+                    ? 'bg-green-700 text-white'
+                    : 'bg-red-700 text-white'
+                }`}
+              >
+                {match.betStatus ? '✓ Ставка сыграла' : '✕ Ставка не сыграла'}
               </div>
             )}
           </div>
