@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, Index } from 'typeorm';
+import type { MatchStatus } from '../nb-bet-parser-main/match.interface.js';
 
 @Entity('matches')
 export class MatchEntity {
@@ -30,6 +31,23 @@ export class MatchEntity {
   @Column({ type: 'varchar', nullable: true })
   liveTime: string | null;
 
+  /**
+   * Явный статус матча: `scheduled` | `live` | `finished`.
+   * Заполняется парсером из типа матча nb-bet, поэтому не требует
+   * косвенных догадок по `score` / `liveTime`.
+   */
+  @Index()
+  @Column({ type: 'varchar', length: 16, default: 'scheduled' })
+  status: MatchStatus;
+
+  /**
+   * Когда матч последний раз встречался в выдаче парсера.
+   * Позволяет отличить действительно идущий матч от «залипшего» live:
+   * если `lastParsedAt` давно в прошлом, матч, скорее всего, уже завершён.
+   */
+  @Column({ type: 'timestamp', nullable: true })
+  lastParsedAt: Date | null;
+
   @Column({ type: 'boolean', default: false })
   marked: boolean;
 
@@ -53,6 +71,9 @@ export class MatchEntity {
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   oddsAway: string | null;
+  
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  finalScore: string | null;
 
   @Index()
   @Column({ type: 'smallint', nullable: true })
@@ -104,6 +125,12 @@ export class MatchEntity {
   @Column({ type: 'timestamp', nullable: true })
   deepAnalyzedAt: Date | null;
   
+  @Column({ type: 'boolean', default: false })
+  betStatus: boolean;  // сыграла ли ставка или нет
+
+  @Column({ type: 'boolean', default: false })
+  matchArchive: boolean;  // Матч в архиве
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   createdAt: Date;
 }

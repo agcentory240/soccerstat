@@ -53,6 +53,8 @@ export class NbBetParserMainService {
       const matches: any = parseMatchesFromDocument(dom.window.document);
       // console.log(JSON.stringify(matches[Object.keys(matches)[0]], null, 2));
       await this.matchesService.saveMany(matches);
+      // Матчи, пропавшие из выдачи с «живой» минутой, помечаем завершёнными
+      await this.matchesService.finishStaleLiveMatches();
       this.client.emit('matches.parsed', { count: matches.length });
       await this.stateService.parsingDone(matches.length);
       return matches;

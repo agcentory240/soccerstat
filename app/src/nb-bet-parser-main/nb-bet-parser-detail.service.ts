@@ -24,6 +24,8 @@ import { extractTeamStats } from './helpers/extract-team-stats.js';
 import { extractLeagueTable } from './helpers/extract-league-table.js';
 import { extractTeamTrends } from './helpers/extract-team-trends.js';
 import { extractTeamSeries } from './helpers/extract-team-series.js';
+import { MatchEntity } from '../matches/match.entity.js';
+import { extractFinalScore } from './helpers/extract-final-score.js';
 
 
 chromium.use(StealthPlugin());
@@ -42,6 +44,69 @@ export class NbBetParserDetailService {
     private readonly matchesService: MatchesService,
     private readonly stateService: StateService,
   ) { }
+
+
+  async parseMatchesScore() {
+    const matches_to_check = await this.matchesService.findSelectedWithPredictionFinished();
+    if (matches_to_check) {
+      matches_to_check.forEach(async match => {
+        await this.parseMatchScore(match);
+      });
+    }
+
+  }
+
+  /**
+   * Парсим детальный счет
+   * @param match 
+   */
+  async parseMatchScore(match: MatchEntity): Promise<any> {
+
+      //Запустим браузер
+      const browser: Browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      });
+
+      try {
+        const page: Page = await browser.newPage();
+        await page.goto(match.url, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60000,
+        });
+
+      await page.waitForTimeout(3000);
+      let html = await page.content();   
+      let dom = new JSDOM(html);
+      
+      const score = extractFinalScore(dom.window.document);
+      if (score) {
+        const finalScore = `${score.total} ${score.byPeriods}`;
+        await this.matchesService.updateFields(match.id, {
+          finalScore: finalScore,
+        });
+
+        // Событие `match_parsed`: в RabbitMQ (запуск глубокого анализа) и Redis/SSE
+        this.client.emit('match.score_parsed', { matchId: match.id, score: finalScore });
+
+        const matchInfo: ServerStateMatchInfo = {
+          id: match.id,
+          homeTeam: match.homeTeam,
+          awayTeam: match.awayTeam,
+          league: match.league,
+          url: match.url,
+        };
+        await this.stateService.finalScoreParsed( matchInfo,finalScore );        
+
+      } else {
+        this.logger.warn(`[${match.id}] Cчёт завершенного матча не найден`);
+      }
+
+      } finally {
+        await browser.close();
+      }
+
+  }
 
   /**
    * Парсит детальную информацию матча по URL.
@@ -77,7 +142,7 @@ export class NbBetParserDetailService {
       // writeFileSync(join(debugDir, `nb-bet-detail-${timestamp}.html`), html, 'utf-8');
 
       let dom = new JSDOM(html);
-      console.log(JSON.stringify(dom));
+      // console.log(JSON.stringify(dom));
 
       //Разбираем по частям
 

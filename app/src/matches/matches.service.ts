@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { MatchEntity } from './match.entity.js';
 import type { Match } from '../nb-bet-parser-main/match.interface.js';
 
@@ -35,6 +35,8 @@ export class MatchesService {
           'awayTeam',
           'score',
           'liveTime',
+          'status',
+          'lastParsedAt',
           'oddsHome',
           'oddsDraw',
           'oddsAway',
@@ -96,6 +98,7 @@ export class MatchesService {
       | 'reason'
       | 'selected'
       | 'marked'
+      | 'finalScore'
       | 'ready'
     >>,
   ): Promise<boolean> {
@@ -113,7 +116,69 @@ export class MatchesService {
 
     this.logger.log(`Updated match id=${id}: ${Object.keys(fields).join(', ')}`);
     return true;
-  }  
+  }
+
+  /**
+   * Помечает «залипшие» live-матчи завершёнными.
+   *
+   * Матч мог исчезнуть из выдачи nb-bet сразу после финального свистка —
+   * тогда в БД остаётся последняя live-минута. Признак «залипания» —
+   * матч давно не встречался в выдаче (`lastParsedAt`). Для старых записей
+   * без `lastParsedAt` используется отсечка по времени начала матча.
+   *
+   * @param maxAgeHours - сколько часов отсутствия в выдаче считать нормой
+   * @returns количество обновлённых записей
+   */
+  async finishStaleLiveMatches(maxAgeHours = 3): Promise<number> {
+    const result = await this.repo
+      .createQueryBuilder()
+      .update(MatchEntity)
+      .set({ status: 'finished', liveTime: null })
+      .where('status = :status', { status: 'live' })
+      .andWhere(
+        `(
+          ("lastParsedAt" IS NOT NULL
+            AND "lastParsedAt" < NOW() - make_interval(hours => :maxAgeHours))
+          OR ("lastParsedAt" IS NULL
+            AND "dateTime" + make_interval(hours => :maxAgeHours) < NOW())
+        )`,
+        { maxAgeHours },
+      )
+      .execute();
+
+    const affected = result.affected ?? 0;
+    if (affected > 0) {
+      this.logger.log(`Marked ${affected} stale live matches as finished`);
+    }
+    return affected;
+  }
+
+  /**
+   * Матчи, для которых есть полноценный прогноз и которые уже завершились.
+   *
+   * Условия:
+   * - `selected` — матч отобран для глубокого анализа;
+   * - `deepAnalyzed` — глубокий анализ выполнен;
+   * - `mainBet IS NOT NULL` и `deepAnalysis IS NOT NULL` — прогноз содержит
+   *   конкретную ставку и полный JSON-ответ (отсекает ветку «недостаточно данных»,
+   *   где `deepAnalyzed = true`, но `finalDecision = 'ПРОПУСТИТЬ'`);
+   * - `status = 'finished'` — матч завершён.
+   */
+  async findSelectedWithPredictionFinished(): Promise<MatchEntity[] | void> {
+    return this.repo.find({
+      where: {
+        selected: true,
+        deepAnalyzed: true,
+        status: 'finished',
+        mainBet: Not(IsNull()),
+        deepAnalysis: Not(IsNull()),
+      },
+      order: { aiScore: 'DESC', dateTime: 'ASC' },
+    }).then((matches:MatchEntity[])=>{
+
+    })
+
+  }
 
   private toEntity(m: Match): Partial<MatchEntity> {
     return {
@@ -125,6 +190,8 @@ export class MatchesService {
       awayTeam: m.awayTeam,
       score: m.score,
       liveTime: m.liveTime,
+      status: m.status,
+      lastParsedAt: new Date(),
       oddsHome: m.odds.home,
       oddsDraw: m.odds.draw,
       oddsAway: m.odds.away,
@@ -154,6 +221,7 @@ export class MatchesService {
       awayTeam: e.awayTeam,
       score: e.score,
       liveTime: e.liveTime,
+      status: e.status,
       odds: {
         home: e.oddsHome,
         draw: e.oddsDraw,

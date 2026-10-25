@@ -1,4 +1,4 @@
-import type { Match } from '../match.interface.js';
+import type { Match, MatchStatus } from '../match.interface.js';
 
 interface LeagueInfo {
   '1': string;   // страна
@@ -19,6 +19,18 @@ interface RawMatch {
   '26'?: number; // голы хозяев (2-й тайм)
   '27'?: number; // голы гостей (2-й тайм)
   '53'?: number; // текущая минута (live)
+}
+
+/**
+ * Преобразует числовой тип матча nb-bet (`RawMatch['1']`) в явный статус.
+ *
+ * 1 — предстоящий, 2 — live, 3 — завершённый.
+ * Любое неожиданное значение считаем предстоящим матчем.
+ */
+export function resolveMatchStatus(type: number | undefined): MatchStatus {
+  if (type === 2) return 'live';
+  if (type === 3) return 'finished';
+  return 'scheduled';
 }
 
 interface NextData {
@@ -68,10 +80,12 @@ export function parseMatchesFromDocument(doc: Document): Match[] {
       const m = matches[matchId];
       if (!m) continue;
 
+      // Статус матча: единственный надёжный источник — тип из nb-bet
+      const status = resolveMatchStatus(m['1']);
+
       // URL
       const urlId = m['3'] || matchId;
-      const isLive = m['1'] === 2;
-      const prefix = isLive ? 'LiveEvents' : 'Events';
+      const prefix = status === 'live' ? 'LiveEvents' : 'Events';
       const url = `https://nb-bet.com/${prefix}/${urlId}`;
 
       // Дата и время
@@ -92,14 +106,17 @@ export function parseMatchesFromDocument(doc: Document): Match[] {
       const away2 = m['27'] ?? 0;
 
       // Счёт показываем, только если матч не предстоящий
-      // (у предстоящих m['1'] === 1, полей для голов нет)
-      const hasScore = m['1'] === 2 || m['1'] === 3;
+      // (у предстоящих нет полей для голов)
+      const hasScore = status !== 'scheduled';
       const score = hasScore
         ? `${home1 + home2} : ${away1 + away2}`
         : null;
 
-      // Live-минута (только для live-матчей)
-      const liveTime = m['53'] != null ? `${m['53']}'` : null;
+      // Live-минута актуальна только для идущих матчей.
+      // Для завершённых принудительно сбрасываем в null,
+      // иначе «последняя минута» залипает в БД.
+      const liveTime =
+        status === 'live' && m['53'] != null ? `${m['53']}'` : null;
 
       // Коэффициенты (текущие — из m['6'])
       const odds = m['6'] || {};
@@ -112,6 +129,7 @@ export function parseMatchesFromDocument(doc: Document): Match[] {
         awayTeam,
         score,
         liveTime,
+        status,
         odds: {
           home: odds['1'] != null ? String(odds['1']) : null,
           draw: odds['2'] != null ? String(odds['2']) : null,

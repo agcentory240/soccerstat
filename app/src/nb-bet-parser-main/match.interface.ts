@@ -4,6 +4,14 @@ export interface MatchOdds {
   away: string | null;
 }
 
+/**
+ * Статус матча по данным nb-bet.
+ * - `scheduled` — матч ещё не начался (тип `1` в исходных данных);
+ * - `live` — матч идёт прямо сейчас (тип `2`);
+ * - `finished` — матч завершён (тип `3`).
+ */
+export type MatchStatus = 'scheduled' | 'live' | 'finished';
+
 export interface Match {
   country: string;
   league: string;
@@ -13,12 +21,16 @@ export interface Match {
   awayTeam: string;
   score: string | null;
   liveTime: string | null;
+  /** Явный статус матча (заменяет косвенные догадки по `score`/`liveTime`). */
+  status: MatchStatus;
   odds: MatchOdds;
   marked?: boolean;
   ready?: boolean;
   selected?: boolean;
   info?: string | null;
   reason?: string | null;
+  betStatus?: boolean;
+  matchArchive?: boolean;
 }
 
 /**

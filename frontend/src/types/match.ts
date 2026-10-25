@@ -1,6 +1,14 @@
 // frontend/src/types/match.ts
 
 /**
+ * Статус матча (ответ от API).
+ * - `scheduled` — матч ещё не начался;
+ * - `live` — матч идёт прямо сейчас;
+ * - `finished` — матч завершён.
+ */
+export type MatchStatus = 'scheduled' | 'live' | 'finished';
+
+/**
  * Основная сущность матча (ответ от API)
  */
 export interface Match {
@@ -13,6 +21,10 @@ export interface Match {
   awayTeam: string;
   score: string | null;
   liveTime: string | null;
+  /** Явный статус матча из парсера */
+  status: MatchStatus;
+  /** Когда матч последний раз встречался в выдаче парсера */
+  lastParsedAt: string | null;
   oddsHome: string | null;
   oddsDraw: string | null;
   oddsAway: string | null;
@@ -23,6 +35,7 @@ export interface Match {
   aiScore: number | null;
   aiMarket: string | null;        // 🆕 рынок от flash-модели
   info: string | null;
+  finalScore?: string | null;
 
   // ===== 🆕 ГЛУБОКИЙ АНАЛИЗ (DeepSeek Pro) =====
   deepAnalyzed: boolean;
@@ -38,6 +51,9 @@ export interface Match {
   deepAnalysis: DeepAnalysis | null;
 
   createdAt: string;
+
+  betStatus: boolean;
+  matchArchive: boolean;
 }
 
 /**

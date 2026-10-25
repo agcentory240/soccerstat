@@ -38,9 +38,14 @@ export function MatchCard({ match,active }: MatchCardProps) {
 
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
           <span>{formatDateTime(match.dateTime)}</span>
-          {match.liveTime && (
+          {match.liveTime && match.status !== 'finished' && (
             <span className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold">
               {match.liveTime}
+            </span>
+          )}
+          {match.status === 'finished' && (
+            <span className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[10px] font-bold">
+              Завершён
             </span>
           )}
         </div>

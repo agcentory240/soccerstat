@@ -29,5 +29,10 @@ export class NbBetParserMainController {
             return new Promise((reject)=>{reject("No match found")})
         }
         
+    }
+
+    @Get('checkBet')
+    async checkBet()  {
+        this.parserDetailService.parseMatchesScore();
     }    
 }

@@ -109,4 +109,27 @@ export class MatchesPipelineController {
       );
     }
   }
+
+  
+
+  @EventPattern('match.score_parsed')
+  async onMatchScoreParsed(@Payload() data: { matchId?: number, score?:string }): Promise<void> {
+    const matchId = data?.matchId;
+    if (!matchId) {
+      this.logger.warn('Получено match.score_parsed без matchId, пропускаю');
+      return;
+    }
+
+    this.logger.log(
+      `Получено match.score_parsed для матча #${matchId} — запускаю анализ ставки`,
+    );
+
+    try {
+      //Тут нужно вызвать простую проверку - сработала ли ставка к текущем счету или нет
+    } catch (err) {
+      this.logger.error(
+        `Ошибка глубокого анализа матча #${matchId}: ${(err as Error).message}`,
+      );
+    }
+  }
 }

@@ -155,6 +155,16 @@ export class StateService {
       progress: null,
       data: { selected },
     });
+  }  
+  
+  async finalScoreParsed(match: ServerStateMatchInfo, score: string): Promise<void> {
+    await this.update({
+      status: 'done',
+      stage: 'score-parsed',
+      message: `Получен финальный счет матча #${match.id}: ${match.homeTeam} — ${match.awayTeam} ${score}`,
+      progress: null,
+      data: { match, score },
+    });
   }
 
   async fail(stage: ServerStateStage, message: string): Promise<void> {

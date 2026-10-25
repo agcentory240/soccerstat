@@ -10,6 +10,6 @@ export const rabbitMQConfig: RmqOptions = {
     queueOptions: {
       durable: true,
     },
-    noAck: false,
+    noAck: true,
   },
 };

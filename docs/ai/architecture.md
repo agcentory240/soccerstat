@@ -90,13 +90,15 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 Таблица `matches` (`MatchEntity`):
 
 - Идентификация: `id`, `url` (уникальный индекс);
-- Матч: `country`, `league`, `dateTime`, `homeTeam`, `awayTeam`, `score`, `liveTime`;
+- Матч: `country`, `league`, `dateTime`, `homeTeam`, `awayTeam`, `score`, `liveTime`, `status`;
 - Коэффициенты: `oddsHome`, `oddsDraw`, `oddsAway` (`decimal`);
 - Состояния: `marked`, `ready`, `selected`;
 - Быстрый анализ: `aiScore` (smallint), `aiReason`, `aiMarket`;
 - Текстовые данные парсера: `info`, `reason`;
 - Глубокий анализ: `deepAnalyzed`, `finalDecision`, `mainBet`, `betCoefficient`, `confidence`, `expectedValue`, `stakeRecommendation`, `deepReasoning`, `summary`, `deepAnalysis` (JSONB), `deepAnalyzedAt`;
-- Служебное: `createdAt`.
+- Служебное: `createdAt`, `lastParsedAt` (когда матч последний раз встречался в выдаче парсера).
+
+Статус матча `status` (`scheduled` | `live` | `finished`) заполняется парсером из типа матча nb-bet (`RawMatch['1']`) и не требует косвенных догадок по `score`/`liveTime`. Значение `scheduled` — матч ещё не начался, `live` — идёт сейчас, `finished` — завершён. Для матчей, пропавших из выдачи с «живой» минутой, `MatchesService.finishStaleLiveMatches()` переводит статус в `finished` и очищает `liveTime`, если `lastParsedAt` старше 3 часов.
 
 Миграции: `app/src/migrations/`. `data-source.ts` содержит `synchronize: true` — учитывай это при работе с миграциями и не полагайся на автосинхронизацию в production.
 
@@ -110,9 +112,10 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 1. `GET /parser/matches` → `NbBetParserMainService.parseMatches()`.
 2. Playwright открывает `https://nb-bet.com/Results`, закрывает cookie-баннер.
 3. HTML сохраняется в `app/debug/` и разбирается через JSDOM.
-4. `MatchesService.saveMany()` делает upsert по `url`.
-5. В RabbitMQ публикуется `matches.parsed` (`{ count }`).
-6. В Redis/SSE публикуется состояние `stage = 'parsed'` с `data.count`.
+4. `MatchesService.saveMany()` делает upsert по `url`, проставляя `status` и `lastParsedAt`.
+5. `MatchesService.finishStaleLiveMatches()` помечает завершёнными live-матчи, не встречавшиеся в выдаче дольше 3 часов.
+6. В RabbitMQ публикуется `matches.parsed` (`{ count }`).
+7. В Redis/SSE публикуется состояние `stage = 'parsed'` с `data.count`.
 
 ### 2. Быстрый AI-анализ (`matches.analyzed`)
 

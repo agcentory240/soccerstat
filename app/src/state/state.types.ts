@@ -12,6 +12,7 @@ export type ServerStateStage =
   | 'detail-parsed'
   | 'deep'
   | 'deep-done'
+  | 'score-parsed'
   | 'all-done';
 
 export interface ServerStateProgress {
@@ -49,6 +50,8 @@ export interface ServerStateData {
   matches?: ServerStateMatchInfo[];
   /** Информация о конкретном матче (`match_parsed` / `match_analize_complete`). */
   match?: ServerStateMatchInfo;
+  /** финальный счет. */
+  score?: string;
 }
 
 export interface ServerStateEvent {
