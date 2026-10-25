@@ -46,14 +46,13 @@ export class NbBetParserDetailService {
   ) { }
 
 
-  async parseMatchesScore() {
-    const matches_to_check = await this.matchesService.findSelectedWithPredictionFinished();
-    if (matches_to_check) {
-      matches_to_check.forEach(async match => {
-        await this.parseMatchScore(match);
-      });
-    }
+  async parseMatchesScore(): Promise<void> {
+    const matchesToCheck = await this.matchesService.findSelectedWithPredictionFinished();
 
+    // Парсим счета последовательно: каждый матч открывает свой браузер
+    for (const match of matchesToCheck) {
+      await this.parseMatchScore(match);
+    }
   }
 
   /**

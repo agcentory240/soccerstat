@@ -112,8 +112,15 @@ export class MatchesPipelineController {
 
   
 
+  /**
+   * После парсинга финального счёта проверяем, сыграла ли ставка.
+   * `analyzeOneScore` пишет результат в `betStatus` и публикует
+   * `match_bet_checked` в Redis.
+   */
   @EventPattern('match.score_parsed')
-  async onMatchScoreParsed(@Payload() data: { matchId?: number, score?:string }): Promise<void> {
+  async onMatchScoreParsed(
+    @Payload() data: { matchId?: number; score?: string },
+  ): Promise<void> {
     const matchId = data?.matchId;
     if (!matchId) {
       this.logger.warn('Получено match.score_parsed без matchId, пропускаю');
@@ -125,10 +132,16 @@ export class MatchesPipelineController {
     );
 
     try {
-      //Тут нужно вызвать простую проверку - сработала ли ставка к текущем счету или нет
+      const result = await this.analyzer.analyzeOneScore(matchId, data?.score);
+      if (result) {
+        this.logger.log(
+          `Ставка «${result.bet}» матча #${matchId}: ` +
+            `${result.won ? 'сыграла' : 'не сыграла'}`,
+        );
+      }
     } catch (err) {
       this.logger.error(
-        `Ошибка глубокого анализа матча #${matchId}: ${(err as Error).message}`,
+        `Ошибка анализа ставки матча #${matchId}: ${(err as Error).message}`,
       );
     }
   }

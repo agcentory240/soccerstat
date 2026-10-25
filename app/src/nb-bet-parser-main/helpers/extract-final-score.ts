@@ -47,9 +47,7 @@ function findMatchContainer(statusEl: Element): Element | null {
   let depth = 0
 
   while (current && depth < 10) {
-    const hasScore = findTotalScore(current) !== null
-    const hasPeriods = findPeriodsScore(current) !== null
-    if (hasScore) return current
+    if (findTotalScore(current) !== null) return current
     current = current.parentElement
     depth++
   }

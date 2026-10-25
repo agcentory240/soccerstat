@@ -96,7 +96,8 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 - Быстрый анализ: `aiScore` (smallint), `aiReason`, `aiMarket`;
 - Текстовые данные парсера: `info`, `reason`;
 - Глубокий анализ: `deepAnalyzed`, `finalDecision`, `mainBet`, `betCoefficient`, `confidence`, `expectedValue`, `stakeRecommendation`, `deepReasoning`, `summary`, `deepAnalysis` (JSONB), `deepAnalyzedAt`;
-- Служебное: `createdAt`, `lastParsedAt` (когда матч последний раз встречался в выдаче парсера).
+- Результат матча: `finalScore` (строка `3:1 (2:0, 1:1)`), `betStatus` (сыграла ли ставка);
+- Служебное: `createdAt`, `lastParsedAt` (когда матч последний раз встречался в выдаче парсера), `matchArchive`.
 
 Статус матча `status` (`scheduled` | `live` | `finished`) заполняется парсером из типа матча nb-bet (`RawMatch['1']`) и не требует косвенных догадок по `score`/`liveTime`. Значение `scheduled` — матч ещё не начался, `live` — идёт сейчас, `finished` — завершён. Для матчей, пропавших из выдачи с «живой» минутой, `MatchesService.finishStaleLiveMatches()` переводит статус в `finished` и очищает `liveTime`, если `lastParsedAt` старше 3 часов.
 
@@ -142,6 +143,15 @@ Frontend (React + Vite) ◄──SSE /events── NestJS API (:3000)
 4. В Redis/SSE публикуется `stage = 'deep-done'` с `data.match` (включая `decision`).
 
 > `POST /matches/analyze` и `GET /matches/:id/deep` остаются для ручного запуска соответствующих этапов.
+
+### 5. Проверка ставки (`match.score_parsed`)
+
+1. `NbBetParserDetailService.parseMatchScore()` извлекает финальный счёт, пишет `finalScore`
+   и публикует `match.score_parsed` (`{ matchId, score }`).
+2. `MatchesPipelineController.onMatchScoreParsed()` вызывает `MatchesAnalyzerService.analyzeOneScore()`.
+3. `deepseek-flash` получает только ставку (`mainBet`) и результат и возвращает `{ "won": boolean }`.
+4. Результат записывается в `matches.betStatus`.
+5. В Redis/SSE публикуется `stage = 'bet-checked'` с `data.bet`, `data.betStatus`, `data.score`.
 
 ### Состояние сервера (Redis → SSE)
 

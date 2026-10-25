@@ -167,6 +167,37 @@ export class StateService {
     });
   }
 
+  async betCheckStart(matchId: number): Promise<void> {
+    await this.update({
+      status: 'analyzing',
+      stage: 'bet-check',
+      message: `Проверка ставки по матчу #${matchId}…`,
+      progress: null,
+      data: undefined,
+    });
+  }
+
+  /**
+   * Событие `match_bet_checked`: ставка проверена по финальному счёту,
+   * результат записан в `matches.betStatus`.
+   */
+  async betChecked(
+    match: ServerStateMatchInfo,
+    bet: string,
+    betStatus: boolean,
+    score: string,
+  ): Promise<void> {
+    await this.update({
+      status: 'done',
+      stage: 'bet-checked',
+      message:
+        `Матч #${match.id}: ставка «${bet}» ` +
+        `${betStatus ? 'сыграла' : 'не сыграла'} (${score})`,
+      progress: null,
+      data: { match, bet, betStatus, score },
+    });
+  }
+
   async fail(stage: ServerStateStage, message: string): Promise<void> {
     await this.update({
       status: 'error',

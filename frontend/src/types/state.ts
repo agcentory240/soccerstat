@@ -14,6 +14,9 @@ export type ServerStateStage =
   | 'detail-parsed'
   | 'deep'
   | 'deep-done'
+  | 'score-parsed'
+  | 'bet-check'
+  | 'bet-checked'
   | 'all-done';
 
 export interface ServerStateProgress {
@@ -39,6 +42,12 @@ export interface ServerStateData {
   selected?: number;
   matches?: ServerStateMatchInfo[];
   match?: ServerStateMatchInfo;
+  /** Финальный счёт матча (`score-parsed` / `bet-checked`). */
+  score?: string;
+  /** Проверяемая ставка (`bet-checked`). */
+  bet?: string;
+  /** Результат проверки ставки: `true` — сыграла, `false` — нет (`bet-checked`). */
+  betStatus?: boolean;
 }
 
 export interface ServerStateEvent {

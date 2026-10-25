@@ -1,11 +1,12 @@
 # AI-пайплайн — инструкции
 
-## 1. Два этапа анализа
+## 1. Этапы анализа
 
 | Этап | Сервис | Модель | Режим | Результат |
 |---|---|---|---|---|
 | Быстрая оценка | `MatchesAnalyzerService.analyzeUnprocessed()` | `deepseek-flash` | `thinking: false` | `aiScore`, `aiReason`, `aiMarket`, `selected` |
 | Глубокий разбор | `MatchesAnalyzerService.analyzeOneDeep()` | `deepseek-v4-pro` | `thinking: true` | `deepAnalysis` + поля решения |
+| Проверка ставки | `MatchesAnalyzerService.analyzeOneScore()` | `deepseek-flash` | `thinking: false` | `betStatus` |
 
 Промпты и интерфейсы ответов — `app/src/ai/ai-prompts.ts`.
 Вызовы и сохранение — `app/src/matches/matches-analyzer.service.ts`.
@@ -91,6 +92,35 @@
 - `deepAnalysis` — полный JSON;
 - `finalDecision`, `mainBet`, `betCoefficient`, `confidence`, `expectedValue`, `stakeRecommendation`, `deepReasoning`, `summary`;
 - `deepAnalyzed = true`, `deepAnalyzedAt = now`.
+
+## 3.1. Проверка ставки по финальному счёту
+
+Запуск: событие RabbitMQ `match.score_parsed` (`{ matchId, score }`) →
+`MatchesPipelineController.onMatchScoreParsed()` → `analyzeOneScore(matchId, score)`.
+
+Вход:
+
+- `mainBet` — ставка из глубокого анализа (если её нет, проверка пропускается);
+- `finalScore` — финальный счёт вида `3:1 (2:0, 1:1)`: итоговый счёт и счёт по таймам
+  в скобках. Разбирается хелпером `parseFinalScore()` в
+  [`parse-final-score.ts`](../../app/src/nb-bet-parser-main/helpers/parse-final-score.ts),
+  сущности — [`bet-check.interface.ts`](../../app/src/matches/bet-check.interface.ts).
+
+Промпт `BET_RESULT_SYSTEM_PROMPT` требует только JSON `{ "won": true | false }`:
+
+- выигрыш → `true`;
+- проигрыш или возврат → `false`;
+- расчёт по основному времени, если в ставке не указано иное.
+
+В модель уходят **только ставка и результат** — никаких дополнительных данных.
+Параметры запроса (максимально экономные): `model: 'deepseek-flash'`, `temperature: 0`,
+`maxTokens: 32`, `thinking: false`, `reasoningEffort: 'none'`.
+
+Сохранение и публикация:
+
+- `matches.betStatus` — `true` / `false`;
+- Redis/SSE — `stage = 'bet-checked'` с `data.match`, `data.bet`, `data.betStatus`, `data.score`;
+- при ошибке AI — `StateService.fail('bet-check', …)`.
 
 ## 4. Особенности DeepSeek
 

@@ -32,7 +32,7 @@ export class NbBetParserMainController {
     }
 
     @Get('checkBet')
-    async checkBet()  {
-        this.parserDetailService.parseMatchesScore();
-    }    
+    async checkBet(): Promise<void> {
+        await this.parserDetailService.parseMatchesScore();
+    }
 }

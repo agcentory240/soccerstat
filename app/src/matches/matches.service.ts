@@ -164,7 +164,7 @@ export class MatchesService {
    *   где `deepAnalyzed = true`, но `finalDecision = 'ПРОПУСТИТЬ'`);
    * - `status = 'finished'` — матч завершён.
    */
-  async findSelectedWithPredictionFinished(): Promise<MatchEntity[] | void> {
+  async findSelectedWithPredictionFinished(): Promise<MatchEntity[]> {
     return this.repo.find({
       where: {
         selected: true,
@@ -174,9 +174,7 @@ export class MatchesService {
         deepAnalysis: Not(IsNull()),
       },
       order: { aiScore: 'DESC', dateTime: 'ASC' },
-    }).then((matches:MatchEntity[])=>{
-
-    })
+    });
 
   }
 

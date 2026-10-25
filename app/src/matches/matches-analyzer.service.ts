@@ -10,10 +10,14 @@ import {
   ScoredMatch,
   DeepAnalysisResult,
   DEEP_ANALYSIS_SYSTEM_PROMPT,
+  BET_RESULT_SYSTEM_PROMPT,
+  BetResultResponse,
 } from '../ai/ai-prompts.js';
 import { ClientProxy } from '@nestjs/microservices';
 import { StateService } from '../state/state.service.js';
 import type { ServerStateMatchInfo } from '../state/state.types.js';
+import type { BetCheckResult } from './bet-check.interface.js';
+import { parseFinalScore, formatScorePair } from '../nb-bet-parser-main/helpers/parse-final-score.js';
 
 @Injectable()
 export class MatchesAnalyzerService {
@@ -366,6 +370,106 @@ ID матча: ${matchId}.
     );
 
     return result;
+  }
+
+  /**
+   * Проверка ставки по финальному счёту матча через flash-модель.
+   *
+   * В AI передаются только два значения — ставка и результат матча,
+   * поэтому запрос максимально дешёвый: без thinking, минимальный `maxTokens`,
+   * `temperature = 0`.
+   *
+   * Результат (`true` — ставка сыграла, `false` — нет) записывается
+   * в `matches.betStatus` и публикуется в Redis через `StateService`.
+   *
+   * @param matchId - ID матча
+   * @param finalScore - финальный счёт из события (если нет — берётся из БД)
+   */
+  async analyzeOneScore(
+    matchId: number,
+    finalScore?: string | null,
+  ): Promise<BetCheckResult | null> {
+    // 1. Загружаем матч
+    const match = await this.repo.findOne({ where: { id: matchId } });
+    if (!match) {
+      this.logger.error(`Match ${matchId} not found`);
+      return null;
+    }
+
+    // 2. Нужна ставка из глубокого анализа — проверять нечего
+    const bet = match.mainBet;
+    if (!bet) {
+      this.logger.warn(`Match ${matchId}: ставка не сформирована, проверка невозможна`);
+      return null;
+    }
+
+    // 3. Разбираем финальный счёт: итог + таймы
+    const scoreRaw = finalScore ?? match.finalScore;
+    const parsedScore = parseFinalScore(scoreRaw);
+    if (!parsedScore) {
+      this.logger.warn(
+        `Match ${matchId}: не удалось разобрать финальный счёт «${scoreRaw ?? '—'}»`,
+      );
+      return null;
+    }
+
+    this.logger.log(
+      `🧮 Проверка ставки матча #${matchId}: «${bet}», счёт ${parsedScore.raw}`,
+    );
+    await this.stateService.betCheckStart(matchId);
+
+    // 4. В промпт уходит только ставка и результат
+    const periodsText = parsedScore.periods.length
+      ? `, по таймам: ${parsedScore.periods.map(formatScorePair).join(', ')}`
+      : '';
+    const userPrompt = `Ставка: ${bet}
+Финальный счёт: ${formatScorePair(parsedScore.total)}${periodsText}`;
+
+    let won: boolean;
+    try {
+      const response = await this.aiService.chatJson<BetResultResponse>(
+        [
+          { role: 'system', content: BET_RESULT_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        {
+          model: 'deepseek-flash', // самая дешёвая (flash) модель
+          temperature: 0,          // детерминированный расчёт
+          maxTokens: 32,           // ответ — один булев флаг
+          thinking: false,         // без размышлений
+          reasoningEffort: 'none', // минимальная стоимость
+        },
+      );
+
+      if (typeof response?.won !== 'boolean') {
+        throw new Error('AI provider: invalid bet result');
+      }
+      won = response.won;
+    } catch (err: any) {
+      this.logger.error(`Bet check failed for ${matchId}: ${err.message}`);
+      await this.stateService.fail(
+        'bet-check',
+        `Ошибка проверки ставки #${matchId}: ${err.message}`,
+      );
+      throw err;
+    }
+
+    // 5. Сохраняем результат в БД
+    await this.repo.update(matchId, { betStatus: won });
+
+    this.logger.log(
+      `✅ Match ${matchId}: ставка «${bet}» ${won ? 'сыграла' : 'не сыграла'}`,
+    );
+
+    // 6. Публикуем результат в Redis/SSE
+    await this.stateService.betChecked(
+      this.toMatchInfo(match),
+      bet,
+      won,
+      parsedScore.raw,
+    );
+
+    return { matchId, bet, finalScore: parsedScore, won };
   }
 
   /**
