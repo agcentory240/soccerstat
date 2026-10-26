@@ -50,6 +50,7 @@ function LogRow({ entry }: { entry: ServerStateLogEntry }) {
  */
 export function RedisLogPanel({ visible = true }: RedisLogPanelProps) {
   const logs = useMatchesStore((s) => s.eventLogs);
+  const clearEventLogs = useMatchesStore((s) => s.clearEventLogs);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedToBottom = useRef(true);
 
@@ -85,7 +86,34 @@ export function RedisLogPanel({ visible = true }: RedisLogPanelProps) {
     >
       <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-3 py-2">
         <span className="text-xs uppercase tracking-wide text-slate-400">Логи Redis</span>
-        <span className="text-[10px] text-slate-500">{logs.length}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-slate-500">{logs.length}</span>
+          <button
+            type="button"
+            onClick={clearEventLogs}
+            disabled={logs.length === 0}
+            title="Очистить логи"
+            aria-label="Очистить логи"
+            className="rounded cursor-pointer p-0.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-500"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 6h18" />
+              <path d="M8 6V4h8v2" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v5" />
+              <path d="M14 11v5" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div

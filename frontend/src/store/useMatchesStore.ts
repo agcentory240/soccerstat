@@ -27,6 +27,8 @@ interface MatchesState {
   loadMatches: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
   connectEvents: () => () => void   // ← подписка на состояние сервера
+  /** Очищает накопленный журнал событий Redis. */
+  clearEventLogs: () => void
   /** Точечно заменяет матч в списке (если он там есть). */
   updateMatch: (match: Match) => void
 }
@@ -68,6 +70,10 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     } finally {
       set({ refreshing: false })
     }
+  },
+
+  clearEventLogs: () => {
+    set({ eventLogs: [] })
   },
 
   updateMatch: (match) => {
