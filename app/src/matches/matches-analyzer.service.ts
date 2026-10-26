@@ -29,7 +29,7 @@ export class MatchesAnalyzerService {
   /** Размер чанка для bulk-update по id (лимит параметров SQL-запроса). */
   private readonly UPDATE_CHUNK_SIZE = 500;
   private readonly MIN_SCORE_THRESHOLD = 6;  // порог для selected
-  private readonly TOP_N = 10;               // максимум выбранных
+  private readonly TOP_N = 20;               // максимум выбранных
 
   constructor(
     @InjectRepository(MatchEntity)
@@ -285,7 +285,7 @@ export class MatchesAnalyzerService {
   /**
    * Глубокий анализ одного матча через DeepSeek Pro
    */
-  async analyzeOneDeep(matchId: number): Promise<DeepAnalysisResult | null> {
+  async analyzeOneDeep(matchId: number, manual: boolean = false): Promise<DeepAnalysisResult | null> {
     // 1. Загружаем матч
     const match = await this.repo.findOne({ where: { id: matchId } });
     if (!match) {
@@ -356,7 +356,7 @@ ID матча: ${matchId}.
     }
 
     // 4. Сохраняем результат
-    await this.saveDeepAnalysis(match, result);
+    await this.saveDeepAnalysis(match, result, manual);
 
     this.logger.log(
       `✅ Match ${matchId}: ${result.final_decision} (conf=${result.prediction?.confidence})`,
@@ -526,6 +526,7 @@ ID матча: ${matchId}.
   private async saveDeepAnalysis(
     match: MatchEntity,
     result: DeepAnalysisResult,
+    manual: boolean = false,
   ): Promise<void> {
     const pred = result.prediction || ({} as any);
     const confidence = pred.confidence ?? null;
@@ -551,6 +552,9 @@ ID матча: ${matchId}.
       // Полный JSON
       deepAnalysis: result as any,
     });
+    if (manual) {
+      await this.repo.update(match.id, { selected: true, marked: true});
+    }
   }
 
   /**

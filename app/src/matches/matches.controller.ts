@@ -45,7 +45,7 @@ export class MatchesController {
 
   @Get(':id/deep')
   async deepAnalyze(@Param('id', ParseIntPipe) id: number) {
-    const result = await this.analyzer.analyzeOneDeep(id);
+    const result = await this.analyzer.analyzeOneDeep(id, true);
     return result ?? { error: 'Analysis failed or insufficient data' };
   }  
 
