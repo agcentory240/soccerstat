@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { fetchMatches, parseMatches } from '../api/matches'
+import { fetchMatches, fetchPrognozedMatches, parseMatches } from '../api/matches'
 import { subscribeToServerState } from '../api/events'
 import type { Match } from '../types/match'
 import type { ServerStateEvent, ServerStateLogEntry } from '../types/state'
@@ -16,6 +16,7 @@ let logSeq = 0
 
 interface MatchesState {
   matches: Match[]
+  prognozedMatches: Match[]
   loading: boolean
   refreshing: boolean   // ← отдельный флаг для "Обновить матчи"
   error: string | null
@@ -25,6 +26,7 @@ interface MatchesState {
   eventLogs: ServerStateLogEntry[]       // ← накопленный журнал событий Redis
 
   loadMatches: () => Promise<void>
+  loadPrognozeMatches: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
   connectEvents: () => () => void   // ← подписка на состояние сервера
   /** Очищает накопленный журнал событий Redis. */
@@ -35,6 +37,7 @@ interface MatchesState {
 
 export const useMatchesStore = create<MatchesState>((set, get) => ({
   matches: [],
+  prognozedMatches: [],
   loading: false,
   refreshing: false,
   error: null,
@@ -48,6 +51,19 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     try {
       const data = await fetchMatches()
       set({ matches: sortMatches(data).slice(0, 500) })
+    } catch (e: unknown) {
+      set({ error: getErrorMessage(e) })
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  loadPrognozeMatches: async () => {
+    if (get().loading) return
+    set({ loading: true, error: null })
+    try {
+      const data = await fetchPrognozedMatches()
+      set({ prognozedMatches: sortMatches(data).slice(0, 500) })
     } catch (e: unknown) {
       set({ error: getErrorMessage(e) })
     } finally {

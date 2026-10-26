@@ -22,6 +22,10 @@ export class MatchesController {
   async findByDate(@Query('date') date: string) {
     return this.matchesService.findByDate(date);
   }
+  @Get('prognozed')
+  async findPrognozed() {
+    return this.matchesService.findPrognozedScored();
+  }
 
   @Post('analyze')
   async analyze() {

@@ -61,6 +61,31 @@ export class MatchesService {
     });
   }
 
+  /**
+   * Матчи, по которым сделан прогноз и которые допущены к ставке.
+   *
+   * Условия:
+   * - `selected` — матч отобран для глубокого анализа;
+   * - `deepAnalyzed` — глубокий анализ выполнен;
+   * - `mainBet IS NOT NULL` и `deepAnalysis IS NOT NULL` — прогноз содержит
+   *   конкретную ставку и полный JSON-ответ (отсекает ветку «недостаточно данных»);
+   * - `finalDecision = 'СТАВИТЬ'` — вердикт модели допускает ставку.
+   *
+   * Статус матча не важен: попадают и завершённые, и live, и предстоящие.
+   */
+  async findPrognozedScored(): Promise<MatchEntity[]> {
+    return this.repo.find({
+      where: {
+        selected: true,
+        deepAnalyzed: true,
+        finalDecision: 'СТАВИТЬ',
+        mainBet: Not(IsNull()),
+        deepAnalysis: Not(IsNull()),
+      },
+      order: { aiScore: 'DESC', dateTime: 'ASC' },
+    });
+  }
+
 
   async findByDate(date: string): Promise<MatchEntity[]> {
     return this.repo

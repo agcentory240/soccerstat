@@ -27,6 +27,7 @@ import { MatchesService } from './matches.service.js';
 
 - `saveMany(matches)` — bulk upsert по `url`, обновляет страну, лигу, дату, команды, счёт, live-время и коэффициенты;
 - `findScored()` — `aiScore > minScore` (`minScore = 3`);
+- `findPrognozedScored()` — матчи с готовым прогнозом и допуском к ставке: `selected = true`, `deepAnalyzed = true`, `finalDecision = 'СТАВИТЬ'`, `mainBet IS NOT NULL`, `deepAnalysis IS NOT NULL`; статус матча не учитывается (завершённые, live и предстоящие), сортировка `aiScore DESC`, `dateTime ASC`;
 - `findByDate(date)` — сравнение `DATE("dateTime")`;
 - `findOne(id)` / `findOneDto(id)`;
 - `updateFields(id, fields)` — частичное обновление `info`, `reason`, `selected`, `marked`, `ready`;

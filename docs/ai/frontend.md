@@ -9,7 +9,8 @@
 ```text
 frontend/src/
 ├── api/           # HTTP-клиент (matches.ts) и SSE-подписка (events.ts)
-├── components/    # Layout, MatchCard, MatchList, MatchDetails, Markdown, TopMenu, RedisLogPanel
+├── components/    # Layout, MatchCard, MatchList, MatchDetails, Markdown, TopMenu, RedisLogPanel,
+│                  # MainMatchList, MainMatchCard, MatchDayDivider
 ├── hooks/         # useMatch
 ├── pages/         # MatchesPage
 ├── store/         # useMatchesStore (Zustand)
@@ -22,7 +23,7 @@ frontend/src/
 
 `App.tsx`:
 
-- `/` → редирект на `/prognoses`;
+- `/` → `MainPage`: список матчей [`MainMatchList`](frontend/src/components/MainMatchList/MainMatchList.tsx), сгруппированный по игровым дням. Между днями выводится [`MatchDayDivider`](frontend/src/components/MatchDayDivider/MatchDayDivider.tsx) с датой дня, карточки пока — заглушки [`MainMatchCard`](frontend/src/components/MainMatchCard/MainMatchCard.tsx) по 5 в ряд (`grid-cols-5`). Данные для группировки берутся из `useMatchesStore`;
 - `/prognoses` → `MatchesPage` со списком;
 - `/prognoses/:id` → `MatchDetails` внутри `Outlet`;
 - без `id` показывается `MatchDetailsPlaceholder`.

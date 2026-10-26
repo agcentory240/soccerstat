@@ -10,6 +10,14 @@ export async function fetchMatches(): Promise<Match[]> {
   return res.json();
 }
 
+export async function fetchPrognozedMatches(): Promise<Match[]> {
+  const res = await fetch(`${API_URL}/matches/prognozed`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch matches: ${res.status}`);
+  }
+  return res.json();
+}
+
 /** Загружает один матч по id (используется для точечного обновления карточки). */
 export async function fetchMatch(id: number): Promise<Match> {
   const res = await fetch(`${API_URL}/matches/${id}`);
@@ -20,30 +28,30 @@ export async function fetchMatch(id: number): Promise<Match> {
 }
 
 export async function parseMatches() {
-  const res = await fetch('http://localhost:3000/parser/matches')
+  const res = await fetch(`${API_URL}parser/matches`)
   if (!res.ok) throw new Error('Ошибка парсинга')
   return res.json()
 }
 
 export async function analyzeMatches() {
-  const res = await fetch('http://localhost:3000/matches/analyze', { method: 'POST' })
+  const res = await fetch('${API_URL}matches/analyze', { method: 'POST' })
   if (!res.ok) throw new Error('Ошибка анализа')
   return res.json()
 }
 
 export async function parseMatchDetails(id: string | number) {
-  const res = await fetch(`http://localhost:3000/parser/matches/${id}`)
+  const res = await fetch(`${API_URL}/parser/matches/${id}`)
   if (!res.ok) throw new Error('Ошибка парсинга деталей матча')
   return res.json()
 }
 
 export async function analizeMatchDetails(id: string | number) {
-  const res = await fetch(`http://localhost:3000/matches/${id}/deep`)
+  const res = await fetch(`${API_URL}/matches/${id}/deep`)
   if (!res.ok) throw new Error('Ошибка парсинга деталей матча')
   return res.json()
 }
 export async function parseMatchScore(id: string | number) {
-  const res = await fetch(`http://localhost:3000/parser/checkbet/${id}`)
+  const res = await fetch(`${API_URL}parser/checkbet/${id}`)
   if (!res.ok) throw new Error('Ошибка парсинга счета матча')
   return res.json()
 }
