@@ -219,8 +219,8 @@ export class MatchesService {
     return this.repo.findOne({
       where: {
         mainBet: Not(IsNull()),
-        finalScore: Not(IsNull()),
         betStatus: IsNull(),
+        selected: true,
       },
       order: { dateTime: 'ASC' },
     });

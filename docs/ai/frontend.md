@@ -23,7 +23,7 @@ frontend/src/
 
 `App.tsx`:
 
-- `/` → `MainPage`: список матчей [`MainMatchList`](frontend/src/components/MainMatchList/MainMatchList.tsx), сгруппированный по игровым дням. Между днями выводится [`MatchDayDivider`](frontend/src/components/MatchDayDivider/MatchDayDivider.tsx) с датой дня, карточки пока — заглушки [`MainMatchCard`](frontend/src/components/MainMatchCard/MainMatchCard.tsx) по 5 в ряд (`grid-cols-5`). Данные для группировки берутся из `useMatchesStore`;
+- `/` → `MainPage`: список матчей [`MainMatchList`](frontend/src/components/MainMatchList/MainMatchList.tsx), сгруппированный по игровым дням. Между днями выводится [`MatchDayDivider`](frontend/src/components/MatchDayDivider/MatchDayDivider.tsx) с датой дня, карточки [`MainMatchCard`](frontend/src/components/MainMatchCard/MainMatchCard.tsx) — по 5 в ряд (`grid-cols-5`), показывают `finalScore` и `betStatus`. Данные берутся из `prognozedMatches` стора. Как и `MatchList`, компонент слушает стадии `score-parsed` / `bet-checked` и точечно обновляет одну карточку через `fetchMatch()` + `updateMatch()`;
 - `/prognoses` → `MatchesPage` со списком;
 - `/prognoses/:id` → `MatchDetails` внутри `Outlet`;
 - без `id` показывается `MatchDetailsPlaceholder`.
@@ -34,7 +34,8 @@ frontend/src/
 
 `useMatchesStore`:
 
-- `matches`, `loading`, `refreshing`, `error`;
+- `matches`, `prognozedMatches`, `loading`, `refreshing`, `error`;
+- `updateMatch(match)` — точечно заменяет матч по `id` сразу в `matches` и `prognozedMatches`; списки, где матча нет, сохраняют ссылку и не вызывают лишних рендеров;
 - `serverState`, `eventsConnected` — состояние сервера из SSE и статус соединения;
 - `eventLogs` — журнал событий Redis (`ServerStateLogEntry[]`, кольцевой буфер на 300 записей), пополняется при каждом SSE-событии;
 - `loadMatches()` — `GET /matches`, сортировка (selected сверху, затем по дате), лимит 500;

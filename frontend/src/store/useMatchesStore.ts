@@ -31,7 +31,10 @@ interface MatchesState {
   connectEvents: () => () => void   // ← подписка на состояние сервера
   /** Очищает накопленный журнал событий Redis. */
   clearEventLogs: () => void
-  /** Точечно заменяет матч в списке (если он там есть). */
+  /**
+   * Точечно заменяет матч во всех загруженных списках (`matches`,
+   * `prognozedMatches`). Списки, где матча нет, не меняются.
+   */
   updateMatch: (match: Match) => void
 }
 
@@ -93,15 +96,11 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
   },
 
   updateMatch: (match) => {
-    set((prev) => {
-      const index = prev.matches.findIndex((m) => m.id === match.id)
-      // Матча нет в загруженном списке — менять нечего.
-      if (index === -1) return prev
-
-      const next = [...prev.matches]
-      next[index] = match
-      return { ...prev, matches: next }
-    })
+    set((prev) => ({
+      ...prev,
+      matches: replaceById(prev.matches, match),
+      prognozedMatches: replaceById(prev.prognozedMatches, match),
+    }))
   },
 
   connectEvents: () => {
@@ -148,6 +147,20 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     }
   },
 }))
+
+/**
+ * Возвращает новый массив с заменённым по `id` матчем.
+ * Если матча в списке нет, возвращается исходный массив (ссылка сохраняется,
+ * поэтому подписчики стора не получают лишних обновлений).
+ */
+function replaceById(list: Match[], match: Match): Match[] {
+  const index = list.findIndex((m) => m.id === match.id)
+  if (index === -1) return list
+
+  const next = [...list]
+  next[index] = match
+  return next
+}
 
 function sortMatches(data: Match[]): Match[] {
   return [...data].sort((a, b) => {

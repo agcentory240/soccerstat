@@ -10,6 +10,7 @@ import { JSDOM } from 'jsdom';
 import { MatchesService } from '../matches/matches.service.js';
 import { ClientProxy } from '@nestjs/microservices';
 import { StateService } from '../state/state.service.js';
+import { Cron } from '@nestjs/schedule';
 
 chromium.use(StealthPlugin());
 
@@ -92,6 +93,16 @@ export class NbBetParserMainService {
       } catch {
         // ignore
       }
+    }
+  }
+
+
+  @Cron('0 0 3 0 0 0')
+  async parsematchesByCron() {
+    try {
+      await this.parseMatches();
+    } catch (err: any) {
+      this.logger.error(`Cron parse failed: ${err.message}`);
     }
   }
 
