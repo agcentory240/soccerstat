@@ -203,6 +203,29 @@ export class MatchesService {
 
   }
 
+  /**
+   * Один матч, по которому ещё не выяснен результат ставки.
+   *
+   * Условия:
+   * - `mainBet IS NOT NULL` — ставка сформирована глубоким анализом;
+   * - `finalScore IS NOT NULL` — финальный счёт уже получен парсером;
+   * - `betStatus IS NULL` — проверка «сыграла / не сыграла» ещё не выполнялась
+   *   (`false` означает «проверено и не сыграла», поэтому не попадает).
+   *
+   * Используется периодической задачей (раз в 2 минуты), которая заново
+   * парсит счёт такого матча и тем самым запускает проверку ставки.
+   */
+  async findOneWithPendingBet(): Promise<MatchEntity | null> {
+    return this.repo.findOne({
+      where: {
+        mainBet: Not(IsNull()),
+        finalScore: Not(IsNull()),
+        betStatus: IsNull(),
+      },
+      order: { dateTime: 'ASC' },
+    });
+  }
+
   private toEntity(m: Match): Partial<MatchEntity> {
     return {
       country: m.country,

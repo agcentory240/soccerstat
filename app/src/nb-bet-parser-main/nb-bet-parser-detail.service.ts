@@ -1,4 +1,5 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { chromium } from 'playwright-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import type { Browser, Page } from 'playwright';
@@ -39,6 +40,9 @@ export class NbBetParserDetailService {
 
   private detail_match: MatchDetails;
 
+  /** Защита от наложения запусков cron-задачи проверки ставки. */
+  private pendingBetRunning = false;
+
   constructor(
     @Inject('MATCHES_SERVICE') private readonly client: ClientProxy,
     private readonly matchesService: MatchesService,
@@ -52,6 +56,51 @@ export class NbBetParserDetailService {
     // Парсим счета последовательно: каждый матч открывает свой браузер
     for (const match of matchesToCheck) {
       await this.parseMatchScore(match);
+    }
+  }
+
+  /**
+   * Раз в 2 минуты берём **один** матч, у которого ставка сформирована и
+   * финальный счёт уже получен, но результат ставки (`betStatus`) ещё не
+   * выяснен, и заново парсим его счёт.
+   *
+   * `parseMatchScore` обновляет `finalScore` и эмитит событие
+   * `match.score_parsed`, по которому {@link MatchesPipelineController}
+   * запускает `analyzeOneScore` — тот записывает `betStatus` и публикует
+   * `match_bet_checked` в Redis/SSE.
+   *
+   * Запуск защищён флагом `pendingBetRunning`: тик пропускается, если
+   * предыдущая проверка ещё держит браузер.
+   */
+  @Cron('0 */2 * * * *', { name: 'pending-bet-check' })
+  async checkPendingBet(): Promise<void> {
+    if (this.pendingBetRunning) {
+      this.logger.debug('Проверка ставки уже выполняется — тик пропущен');
+      return;
+    }
+
+    this.pendingBetRunning = true;
+
+    try {
+      const match = await this.matchesService.findOneWithPendingBet();
+
+      if (!match) {
+        this.logger.debug('Нет матчей с невыясненным результатом ставки');
+        return;
+      }
+
+      this.logger.log(
+        `Проверяю ставку матча #${match.id} (${match.homeTeam} — ${match.awayTeam}), ` +
+          `счёт ${match.finalScore ?? '—'}, ставка «${match.mainBet ?? '—'}»`,
+      );
+
+      await this.parseMatchScore(match);
+    } catch (err) {
+      this.logger.error(
+        `Ошибка периодической проверки ставки: ${(err as Error).message}`,
+      );
+    } finally {
+      this.pendingBetRunning = false;
     }
   }
 

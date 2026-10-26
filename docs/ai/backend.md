@@ -28,6 +28,7 @@ import { MatchesService } from './matches.service.js';
 - `saveMany(matches)` — bulk upsert по `url`, обновляет страну, лигу, дату, команды, счёт, live-время и коэффициенты;
 - `findScored()` — `aiScore > minScore` (`minScore = 3`);
 - `findPrognozedScored()` — матчи с готовым прогнозом и допуском к ставке: `selected = true`, `deepAnalyzed = true`, `finalDecision = 'СТАВИТЬ'`, `mainBet IS NOT NULL`, `deepAnalysis IS NOT NULL`; статус матча не учитывается (завершённые, live и предстоящие), сортировка `aiScore DESC`, `dateTime ASC`;
+- `findOneWithPendingBet()` — **один** матч с невыясненным результатом ставки: `mainBet IS NOT NULL`, `finalScore IS NOT NULL`, `betStatus IS NULL`; сортировка `dateTime ASC`. Используется cron-задачей проверки ставки;
 - `findByDate(date)` — сравнение `DATE("dateTime")`;
 - `findOne(id)` / `findOneDto(id)`;
 - `updateFields(id, fields)` — частичное обновление `info`, `reason`, `selected`, `marked`, `ready`;
@@ -54,6 +55,8 @@ import { MatchesService } from './matches.service.js';
 
 - `NbBetParserMainService.parseMatches()` — Playwright (`playwright-extra` + stealth), `https://nb-bet.com/Results`, сохранение HTML в `app/debug/`, JSDOM, `parseMatchesFromDocument`, upsert, событие `matches.parsed`.
 - `NbBetParserDetailService.parseMatch(match)` — открывает `match.url`, последовательно кликает вкладки («Мотивация», «Прогнозы», «Сводная», «Между собой») и собирает Markdown в `info` через хелперы `helpers/extract-*.ts`.
+- `NbBetParserDetailService.parseMatchScore(match)` — открывает `match.url`, извлекает финальный счёт (`extractFinalScore`), пишет `finalScore`, эмитит `match.score_parsed` и публикует `StateService.finalScoreParsed()`.
+- `NbBetParserDetailService.checkPendingBet()` — `@Cron('0 */2 * * * *')`: раз в 2 минуты берёт один матч из `findOneWithPendingBet()` и вызывает `parseMatchScore()`. Флаг `pendingBetRunning` не даёт тикам наложиться. Цепочка: `match.score_parsed` → `MatchesAnalyzerService.analyzeOneScore()` → `betStatus` + `match_bet_checked`.
 - Хелперы должны оставаться «чистыми»: принимают `Document` и возвращают типизированные данные, без побочных эффектов.
 
 Селекторы `nb-bet.com` хрупкие. При изменении вёрстки:
@@ -65,11 +68,12 @@ import { MatchesService } from './matches.service.js';
 
 - Очередь `matches_queue`, `durable: true`.
 - Клиент `MATCHES_SERVICE` инжектится как `@Inject('MATCHES_SERVICE')`.
-- Исходящие события: `matches.parsed`, `matches.analyzed`, `match.parsed`.
+- Исходящие события: `matches.parsed`, `matches.analyzed`, `match.parsed`, `match.score_parsed`.
 - Обработчики событий — `MatchesPipelineController` (`app/src/nb-bet-parser-main/matches-pipeline.controller.ts`):
   - `matches.parsed` → `MatchesAnalyzerService.analyzeUnprocessed()`;
   - `matches.analyzed` → `NbBetParserDetailService.parseMatch()` для каждого `topId`, затем `StateService.allDone()`;
-  - `match.parsed` → `MatchesAnalyzerService.analyzeOneDeep()`.
+  - `match.parsed` → `MatchesAnalyzerService.analyzeOneDeep()`;
+  - `match.score_parsed` → `MatchesAnalyzerService.analyzeOneScore()` — проверка, сыграла ли ставка, запись `betStatus`.
 - Обработчики ловят ошибки и не пробрасывают их (только логируют), чтобы сообщение подтверждалось при `noAck: false`.
 
 ### `StateModule`
