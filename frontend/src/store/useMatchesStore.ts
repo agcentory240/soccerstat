@@ -27,6 +27,8 @@ interface MatchesState {
   loadMatches: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
   connectEvents: () => () => void   // ← подписка на состояние сервера
+  /** Точечно заменяет матч в списке (если он там есть). */
+  updateMatch: (match: Match) => void
 }
 
 export const useMatchesStore = create<MatchesState>((set, get) => ({
@@ -66,6 +68,18 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     } finally {
       set({ refreshing: false })
     }
+  },
+
+  updateMatch: (match) => {
+    set((prev) => {
+      const index = prev.matches.findIndex((m) => m.id === match.id)
+      // Матча нет в загруженном списке — менять нечего.
+      if (index === -1) return prev
+
+      const next = [...prev.matches]
+      next[index] = match
+      return { ...prev, matches: next }
+    })
   },
 
   connectEvents: () => {

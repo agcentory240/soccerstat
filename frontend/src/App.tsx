@@ -1,5 +1,5 @@
 import { Layout } from './components/Layout/Layout';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MatchesPage } from './pages/MatchesPage/MatchesPage';
 import { MatchDetails } from './components/MatchDetails/MatchDetails';
 import { MatchDetailsPlaceholder } from './components/MatchDetails/MatchDetailsPlaceholder';

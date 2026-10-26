@@ -64,9 +64,21 @@ export function MatchCard({ match,active }: MatchCardProps) {
             <div className="text-sm font-medium truncate">{match.homeTeam}</div>
             <div className="text-sm font-medium truncate">{match.awayTeam}</div>
           </div>
-          {match.score && (
-            <div className="text-lg font-bold text-emerald-400 ml-2">
-              {match.score}
+          {(match.score || match.finalScore) && (
+            <div className="ml-2 text-right shrink-0">
+              {match.score && (
+                <div className="text-lg font-bold text-emerald-400">
+                  {match.score}
+                </div>
+              )}
+              {match.finalScore && (
+                <div className="text-[11px] text-slate-400">
+                  Финальный счёт:{' '}
+                  <span className="font-semibold text-sky-300">
+                    {match.finalScore}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -111,17 +123,22 @@ export function MatchCard({ match,active }: MatchCardProps) {
                 Банк: {match.stakeRecommendation}
               </div>
             )}
-            {betChecked && (
-              <div
-                className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  match.betStatus
-                    ? 'bg-green-700 text-white'
-                    : 'bg-red-700 text-white'
-                }`}
-              >
-                {match.betStatus ? '✓ Ставка сыграла' : '✕ Ставка не сыграла'}
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* Результат проверки ставки по финальному счёту — показываем,
+            как только проверка выполнена, независимо от наличия прогноза. */}
+        {betChecked && (
+          <div className="mt-2">
+            <span
+              className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                match.betStatus
+                  ? 'bg-green-700 text-white'
+                  : 'bg-red-700 text-white'
+              }`}
+            >
+              {match.betStatus ? '✓ Ставка сыграла' : '✕ Ставка не сыграла'}
+            </span>
           </div>
         )}
       </div>

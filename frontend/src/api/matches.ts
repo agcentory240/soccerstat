@@ -10,6 +10,15 @@ export async function fetchMatches(): Promise<Match[]> {
   return res.json();
 }
 
+/** Загружает один матч по id (используется для точечного обновления карточки). */
+export async function fetchMatch(id: number): Promise<Match> {
+  const res = await fetch(`${API_URL}/matches/${id}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch match ${id}: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function parseMatches() {
   const res = await fetch('http://localhost:3000/parser/matches')
   if (!res.ok) throw new Error('Ошибка парсинга')

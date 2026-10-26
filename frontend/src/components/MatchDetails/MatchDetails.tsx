@@ -2,7 +2,7 @@
 import { useParams } from 'react-router-dom';
 import { useMatch } from '../../hooks/useMatch';
 import { Markdown } from '../Markdown/Markdown';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { analizeMatchDetails, parseMatchDetails, parseMatchScore } from '../../api/matches';
 import { getErrorMessage } from '../../utils/error';
 import { formatMatchDateTime } from '../../utils/dateTime';
@@ -11,6 +11,7 @@ import type {
   DeepAnalysisAlternativeBet,
   DeepAnalysisAvoid,
 } from '../../types/match';
+import { useMatchesStore } from '../../store/useMatchesStore';
 
 export function MatchDetails() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +19,34 @@ export function MatchDetails() {
 
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
+  const serverState = useMatchesStore((s) => s.serverState)
+
+  /**
+   * Ключ `<id>:<updatedAt>` последнего обработанного события —
+   * защита от повторной загрузки на лишних рендерах и при смене матча.
+   */
+  const lastEventUpdateRef = useRef<string | null>(null)
+
+  /**
+   * Как только сервер получил финальный счёт (`score-parsed`) или проверил
+   * ставку (`bet-checked`) по этому матчу, перечитываем матч, чтобы показать
+   * актуальные `finalScore` / `betStatus`.
+   * Загрузка «тихая», чтобы не мигать состоянием «Загрузка матча...».
+   */
+  useEffect(() => {
+    if (!serverState || serverState.status !== 'done') return
+    if (serverState.stage !== 'score-parsed' && serverState.stage !== 'bet-checked') return
+
+    const eventMatchId = serverState.data?.match?.id
+    // Событие по другому матчу — игнорируем.
+    if (eventMatchId != null && eventMatchId !== Number(id)) return
+
+    const eventKey = `${id}:${serverState.updatedAt}`
+    if (lastEventUpdateRef.current === eventKey) return
+
+    lastEventUpdateRef.current = eventKey
+    void refetch({ silent: true })
+  }, [serverState, id, refetch])
 
   const handleMakePrediction = async () => {
     if (!id || parsing) return
@@ -57,12 +86,30 @@ export function MatchDetails() {
 
       <div className="flex flex-row justify-between">
         <div>
+
           <h2 className="text-xl font-bold text-emerald-400 mb-2">
             {match.homeTeam} — {match.awayTeam}
           </h2>
           <p className="text-slate-400 mb-4">
             {match.country} · {match.league}
           </p>
+
+          {match.finalScore && 
+          <h2 className="text-2xl font-bold text-sky-50 mb-2">
+            {match.finalScore}
+          </h2>}
+
+          {match.url && (
+              <a
+                href={match.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative z-20 inline-block mt-2 text-xs text-emerald-400 hover:text-emerald-300 underline"
+              >
+                Открыть на nb-bet →
+              </a>
+            )}
+
         </div>
 
         <div className="flex flex-row gap-2">
@@ -117,6 +164,14 @@ export function MatchDetails() {
         <div className="text-slate-300">
           <span className="text-slate-500">Коэффициенты:</span> П1 {match.oddsHome}, X {match.oddsDraw}, П2 {match.oddsAway}
         </div>
+        {match.betStatus !== null && (
+          <div className="text-slate-300">
+            <span className="text-slate-500">Ставка:</span>{' '}
+            <span className={match.betStatus ? 'text-green-400' : 'text-red-400'}>
+              {match.betStatus ? 'сыграла' : 'не сыграла'}
+            </span>
+          </div>
+        )}
 
         {match.aiReason && (
           <div className="p-3 bg-emerald-950/40 border border-emerald-800 rounded">

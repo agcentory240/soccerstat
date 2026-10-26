@@ -4,16 +4,31 @@ import { getErrorMessage } from '../utils/error';
 
 const API_URL = 'http://localhost:3000';
 
+/** Опции повторной загрузки матча. */
+interface LoadMatchOptions {
+  /**
+   * Не показывать состояние загрузки (и не сбрасывать ошибку).
+   * Используется для фонового обновления по SSE-событию `bet-checked`,
+   * чтобы уже отрисованный матч не пропадал из интерфейса.
+   */
+  silent?: boolean;
+}
+
 export function useMatch(id: string | undefined) {
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options: LoadMatchOptions = {}) => {
     if (!id) return;
 
-    setLoading(true);
-    setError(null);
+    const { silent = false } = options;
+
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
+
     try {
       const res = await fetch(`${API_URL}/matches/${id}`);
       if (!res.ok) {
@@ -26,9 +41,9 @@ export function useMatch(id: string | undefined) {
       const data = await res.json();
       setMatch(data);
     } catch (e: unknown) {
-      setError(getErrorMessage(e));
+      if (!silent) setError(getErrorMessage(e));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
