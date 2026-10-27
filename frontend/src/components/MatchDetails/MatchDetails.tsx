@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { analizeMatchDetails, parseMatchDetails, parseMatchScore } from '../../api/matches';
 import { getErrorMessage } from '../../utils/error';
 import { formatMatchDateTime } from '../../utils/dateTime';
+import { formatConfidence } from '../../utils/format';
 import type {
   DeepAnalysis,
   DeepAnalysisAlternativeBet,
@@ -80,6 +81,17 @@ export function MatchDetails() {
   if (!match) {
     return <div className="p-6 text-slate-500">Матч не найден</div>;
   }
+
+  /**
+   * Уверенность модели в процентах.
+   *
+   * Основной источник — сохранённое поле `match.confidence` (строка из БД),
+   * фолбэк — `prediction.confidence` из полного JSON глубокого анализа.
+   * Расчёт выполняет общий [`formatConfidence()`](frontend/src/utils/format.ts:14).
+   */
+  const confidencePct = formatConfidence(
+    match.confidence ?? match.deepAnalysis?.prediction?.confidence ?? null,
+  );
 
   return (
     <div className="p-6">
@@ -164,6 +176,20 @@ export function MatchDetails() {
         <div className="text-slate-300">
           <span className="text-slate-500">Коэффициенты:</span> П1 {match.oddsHome}, X {match.oddsDraw}, П2 {match.oddsAway}
         </div>
+        {match.mainBet && (
+          <div className="text-slate-300">
+            <span className="text-slate-500">Основная ставка:</span>{' '}
+            <span className="text-orange-400 font-semibold">{match.mainBet}</span>
+            {match.betCoefficient && (
+              <span className="text-slate-400"> ({match.betCoefficient})</span>
+            )}
+            {confidencePct !== null && (
+              <span className="text-indigo-300">
+                {' '}· Уверенность: {confidencePct}%
+              </span>
+            )}
+          </div>
+        )}
         {match.betStatus !== null && (
           <div className="text-slate-300">
             <span className="text-slate-500">Ставка:</span>{' '}
@@ -216,10 +242,8 @@ function DeepAnalysisBlock({ analysis }: { analysis: DeepAnalysis }) {
     decisionStyles[decision] ||
     'bg-slate-800/40 border-slate-600 text-slate-300';
 
-  // Confidence в проценты
-  const confidencePct = prediction.confidence
-    ? Math.round(prediction.confidence * 100)
-    : null;
+  // Confidence в проценты — та же логика, что и в шапке матча
+  const confidencePct = formatConfidence(prediction.confidence);
 
   // Цвет confidence
   const confidenceColor =

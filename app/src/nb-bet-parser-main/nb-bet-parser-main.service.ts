@@ -18,6 +18,9 @@ chromium.use(StealthPlugin());
 export class NbBetParserMainService {
   private readonly logger = new Logger(NbBetParserMainService.name);
 
+  /** Защита от наложения запусков: парсинг списка держит Playwright долго. */
+  private parsingByCronRunning = false;
+
 
   constructor(
     private readonly matchesService: MatchesService,
@@ -97,12 +100,30 @@ export class NbBetParserMainService {
   }
 
 
-  @Cron('0 0 3 0 0 0')
-  async parsematchesByCron() {
+  /**
+   * Ежедневный парсинг списка матчей в 03:00.
+   *
+   * Формат `@Cron` — `секунды минуты часы день_месяца месяц день_недели`,
+   * поэтому «любой» день задаётся звёздочкой. Выражение `0 0 3 0 0 0`
+   * содержало нули в полях дня месяца (1–31) и месяца (1–12), из-за чего
+   * `cron` падал при bootstrap:
+   * `CronError: Field value (0) is out of range`.
+   */
+  @Cron('0 0 3 * * *')
+  async parsematchesByCron(): Promise<void> {
+    if (this.parsingByCronRunning) {
+      this.logger.debug('Парсинг списка уже выполняется — тик пропущен');
+      return;
+    }
+
+    this.parsingByCronRunning = true;
+
     try {
       await this.parseMatches();
-    } catch (err: any) {
-      this.logger.error(`Cron parse failed: ${err.message}`);
+    } catch (err) {
+      this.logger.error(`Cron parse failed: ${(err as Error).message}`);
+    } finally {
+      this.parsingByCronRunning = false;
     }
   }
 

@@ -29,7 +29,7 @@ export class MatchesAnalyzerService {
   /** Размер чанка для bulk-update по id (лимит параметров SQL-запроса). */
   private readonly UPDATE_CHUNK_SIZE = 500;
   private readonly MIN_SCORE_THRESHOLD = 6;  // порог для selected
-  private readonly TOP_N = 20;               // максимум выбранных
+  private readonly TOP_N = 40;               // максимум выбранных
 
   constructor(
     @InjectRepository(MatchEntity)

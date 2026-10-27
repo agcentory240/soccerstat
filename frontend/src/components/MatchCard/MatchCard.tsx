@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { FinalDecision, Match } from '../../types/match';
 import { formatMatchDateTime } from '../../utils/dateTime';
+import { formatConfidence } from '../../utils/format';
 
 interface MatchCardProps {
   match: Match;
@@ -183,18 +184,6 @@ function decisionBadgeStyle(decision: FinalDecision | null): string {
     default:
       return 'bg-indigo-700 text-white';
   }
-}
-
-/**
- * Уверенность приходит строкой. В БД она хранится как доля (0–1),
- * но на всякий случай поддерживаем и уже переведённые проценты.
- */
-function formatConfidence(value: string | null): number | null {
-  if (!value) return null;
-  const num = Number(value);
-  if (!Number.isFinite(num)) return null;
-  const pct = num <= 1 ? num * 100 : num;
-  return Math.round(pct);
 }
 
 function OddBadge({ label, value }: { label: string; value: string | null }) {

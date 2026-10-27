@@ -208,22 +208,25 @@ export class MatchesService {
    *
    * Условия:
    * - `mainBet IS NOT NULL` — ставка сформирована глубоким анализом;
-   * - `finalScore IS NOT NULL` — финальный счёт уже получен парсером;
    * - `betStatus IS NULL` — проверка «сыграла / не сыграла» ещё не выполнялась
-   *   (`false` означает «проверено и не сыграла», поэтому не попадает).
+   *   (`false` означает «проверено и не сыграла», поэтому не попадает);
+   * - `selected = true` — матч отобран для глубокого анализа;
+   * - `dateTime + 90 минут < NOW()` — расчётное время окончания матча уже прошло,
+   *   поэтому счёт можно считать финальным (status не проверяем: у «залипших»
+   *   live-матчей он может остаться прежним).
    *
    * Используется периодической задачей (раз в 2 минуты), которая заново
    * парсит счёт такого матча и тем самым запускает проверку ставки.
    */
   async findOneWithPendingBet(): Promise<MatchEntity | null> {
-    return this.repo.findOne({
-      where: {
-        mainBet: Not(IsNull()),
-        betStatus: IsNull(),
-        selected: true,
-      },
-      order: { dateTime: 'ASC' },
-    });
+    return this.repo
+      .createQueryBuilder('m')
+      .where('m."mainBet" IS NOT NULL')
+      .andWhere('m."betStatus" IS NULL')
+      .andWhere('m."selected" = true')
+      .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
+      .orderBy('m."dateTime"', 'ASC')
+      .getOne();
   }
 
   private toEntity(m: Match): Partial<MatchEntity> {
