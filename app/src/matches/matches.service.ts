@@ -179,28 +179,28 @@ export class MatchesService {
   }
 
   /**
-   * Матчи, для которых есть полноценный прогноз и которые уже завершились.
+   * Матчи, которые нужно проверить на счёт после завершения.
    *
    * Условия:
+   * - `marked` — матч отмечен пользователем;
    * - `selected` — матч отобран для глубокого анализа;
-   * - `deepAnalyzed` — глубокий анализ выполнен;
-   * - `mainBet IS NOT NULL` и `deepAnalysis IS NOT NULL` — прогноз содержит
-   *   конкретную ставку и полный JSON-ответ (отсекает ветку «недостаточно данных»,
-   *   где `deepAnalyzed = true`, но `finalDecision = 'ПРОПУСТИТЬ'`);
-   * - `status = 'finished'` — матч завершён.
+   * - `betStatus IS NULL` — результат ставки ещё не выяснен
+   *   (`false` означает «проверено и не сыграла», поэтому не попадает);
+   * - `dateTime + 90 минут < NOW()` — расчётное время окончания матча уже прошло,
+   *   поэтому счёт можно считать финальным (status не проверяем: у «залипших»
+   *   live-матчей он может остаться прежним).
+   *
+   * Сортировка — по времени начала матча по убыванию (сначала свежие).
    */
   async findSelectedWithPredictionFinished(): Promise<MatchEntity[]> {
-    return this.repo.find({
-      where: {
-        selected: true,
-        deepAnalyzed: true,
-        status: 'finished',
-        mainBet: Not(IsNull()),
-        deepAnalysis: Not(IsNull()),
-      },
-      order: { aiScore: 'DESC', dateTime: 'ASC' },
-    });
-
+    return this.repo
+      .createQueryBuilder('m')
+      .where('m."marked" = true')
+      .andWhere('m."selected" = true')
+      .andWhere('m."betStatus" IS NULL')
+      .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
+      .orderBy('m."dateTime"', 'DESC')
+      .getMany();
   }
 
   /**

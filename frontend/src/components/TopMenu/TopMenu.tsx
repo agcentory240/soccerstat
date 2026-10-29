@@ -49,6 +49,8 @@ export function TopMenu({ logPanelVisible, onToggleLogPanel }: TopMenuProps) {
 
   const refreshing = useMatchesStore((s) => s.refreshing)
   const refreshAll = useMatchesStore((s) => s.refreshAll)
+  const checkingBets = useMatchesStore((s) => s.checkingBets)
+  const checkBets = useMatchesStore((s) => s.checkBets)
   const serverState = useMatchesStore((s) => s.serverState)
   const eventsConnected = useMatchesStore((s) => s.eventsConnected)
   const status = describeState(serverState, eventsConnected)
@@ -143,10 +145,23 @@ export function TopMenu({ logPanelVisible, onToggleLogPanel }: TopMenuProps) {
       </div>
 
       <button
+        onClick={checkBets}
+        disabled={checkingBets}
+        className="px-3 py-1.5 text-sm text-white bg-sky-600 hover:bg-sky-500
+                   rounded transition ml-auto disabled:opacity-60 disabled:cursor-not-allowed
+                   flex items-center gap-2"
+      >
+        {checkingBets && (
+          <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+        )}
+        {checkingBets ? 'Проверка...' : 'Проверить ставки'}
+      </button>
+
+      <button
         onClick={refreshAll}
         disabled={refreshing}
         className="px-3 py-1.5 text-sm text-white bg-emerald-600 hover:bg-emerald-500
-                   rounded transition ml-auto disabled:opacity-60 disabled:cursor-not-allowed
+                   rounded transition disabled:opacity-60 disabled:cursor-not-allowed
                    flex items-center gap-2"
       >
         {refreshing && (

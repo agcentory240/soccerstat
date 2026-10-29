@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import { fetchMatches, fetchPrognozedMatches, parseMatches } from '../api/matches'
+import {
+  checkBets as checkBetsRequest,
+  fetchMatches,
+  fetchPrognozedMatches,
+  parseMatches,
+} from '../api/matches'
 import { subscribeToServerState } from '../api/events'
 import type { Match } from '../types/match'
 import type { ServerStateEvent, ServerStateLogEntry } from '../types/state'
@@ -19,6 +24,7 @@ interface MatchesState {
   prognozedMatches: Match[]
   loading: boolean
   refreshing: boolean   // ← отдельный флаг для "Обновить матчи"
+  checkingBets: boolean // ← отдельный флаг для "Проверить ставки"
   error: string | null
 
   serverState: ServerStateEvent | null   // ← состояние сервера из Redis через SSE
@@ -28,6 +34,7 @@ interface MatchesState {
   loadMatches: () => Promise<void>
   loadPrognozeMatches: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
+  checkBets: () => Promise<void>    // ← массовая проверка ставок по завершённым матчам
   connectEvents: () => () => void   // ← подписка на состояние сервера
   /** Очищает накопленный журнал событий Redis. */
   clearEventLogs: () => void
@@ -43,6 +50,7 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
   prognozedMatches: [],
   loading: false,
   refreshing: false,
+  checkingBets: false,
   error: null,
   serverState: null,
   eventsConnected: false,
@@ -88,6 +96,22 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
       set({ error: getErrorMessage(e) })
     } finally {
       set({ refreshing: false })
+    }
+  },
+
+  checkBets: async () => {
+    if (get().checkingBets) return
+    set({ checkingBets: true, error: null })
+    try {
+      // Сервер последовательно парсит счёт отмеченных матчей и обновляет betStatus.
+      await checkBetsRequest()
+      // Перезагружаем список, чтобы показать новые результаты проверки.
+      const data = await fetchMatches()
+      set({ matches: sortMatches(data).slice(0, 500) })
+    } catch (e: unknown) {
+      set({ error: getErrorMessage(e) })
+    } finally {
+      set({ checkingBets: false })
     }
   },
 

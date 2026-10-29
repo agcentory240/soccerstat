@@ -55,3 +55,10 @@ export async function parseMatchScore(id: string | number) {
   if (!res.ok) throw new Error('Ошибка парсинга счета матча')
   return res.json()
 }
+
+/** Запускает массовую проверку ставок по завершённым матчам (`/parser/checkbets`). */
+export async function checkBets() {
+  const res = await fetch(`${API_URL}/parser/checkbets`)
+  if (!res.ok) throw new Error('Ошибка проверки ставок')
+  return res.json()
+}
