@@ -203,7 +203,7 @@ export class MatchesService {
       .andWhere('m."selected" = true')
       .andWhere('m."deepAnalyzed" = true')
       .andWhere('m."betStatus" IS NULL')
-      .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
+      // .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
       .andWhere(`m."status" IN ('scheduled', 'live', 'finished')`)
       .orderBy('m."dateTime"', 'DESC')
       .getMany();
@@ -217,9 +217,11 @@ export class MatchesService {
    * - `betStatus IS NULL` — проверка «сыграла / не сыграла» ещё не выполнялась
    *   (`false` означает «проверено и не сыграла», поэтому не попадает);
    * - `selected = true` — матч отобран для глубокого анализа;
-   * - `dateTime + 90 минут < NOW()` — расчётное время окончания матча уже прошло,
-   *   поэтому счёт можно считать финальным (status не проверяем: у «залипших»
-   *   live-матчей он может остаться прежним);
+   * - `dateTime + 90 минут < NOW() AT TIME ZONE 'Europe/Moscow'` — расчётное время
+   *   окончания матча уже прошло по московскому времени. Поле `dateTime` хранит
+   *   «настенное» МСК-время (парсер пишет локальное время процесса), а `NOW()`
+   *   возвращает UTC, поэтому сравниваем именно с МСК — иначе проверка
+   *   задерживается на 3 часа;
    * - `status NOT IN ('postponed', 'canceled')` — перенесённые и отменённые
    *   матчи счёта не получат, поэтому не должны занимать очередь проверки.
    *
@@ -232,7 +234,9 @@ export class MatchesService {
       .where('m."mainBet" IS NOT NULL')
       .andWhere('m."betStatus" IS NULL')
       .andWhere('m."selected" = true')
-      .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
+      // .andWhere(
+      //   `m."dateTime" + INTERVAL '90 minutes' < (NOW() AT TIME ZONE 'Europe/Moscow')`,
+      // )
       .andWhere(`m."status" NOT IN ('postponed', 'canceled')`)
       .orderBy('m."dateTime"', 'ASC')
       .getOne();
