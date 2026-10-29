@@ -32,9 +32,12 @@ export class MatchEntity {
   liveTime: string | null;
 
   /**
-   * Явный статус матча: `scheduled` | `live` | `finished`.
-   * Заполняется парсером из типа матча nb-bet, поэтому не требует
-   * косвенных догадок по `score` / `liveTime`.
+   * Явный статус матча:
+   * `scheduled` | `live` | `finished` | `postponed` | `canceled`.
+   * Базовые значения (`scheduled`/`live`/`finished`) заполняются парсером
+   * списка из типа матча nb-bet; `postponed` и `canceled` выставляются
+   * проверкой детальной страницы матча и исключают его из повторного
+   * парсинга счёта.
    */
   @Index()
   @Column({ type: 'varchar', length: 16, default: 'scheduled' })

@@ -55,8 +55,9 @@ import { MatchesService } from './matches.service.js';
 
 - `NbBetParserMainService.parseMatches()` — Playwright (`playwright-extra` + stealth), `https://nb-bet.com/Results`, сохранение HTML в `app/debug/`, JSDOM, `parseMatchesFromDocument`, upsert, событие `matches.parsed`.
 - `NbBetParserDetailService.parseMatch(match)` — открывает `match.url`, последовательно кликает вкладки («Мотивация», «Прогнозы», «Сводная», «Между собой») и собирает Markdown в `info` через хелперы `helpers/extract-*.ts`.
-- `NbBetParserDetailService.parseMatchScore(match)` — открывает `match.url`, извлекает финальный счёт (`extractFinalScore`), пишет `finalScore`, эмитит `match.score_parsed` и публикует `StateService.finalScoreParsed()`.
+- `NbBetParserDetailService.parseMatchScore(match)` — открывает `match.url`, сначала проверяет перенос/отмену (`extractMatchResolution`) и при обнаружении пишет `status = 'postponed' | 'canceled'` без разбора счёта; иначе извлекает финальный счёт (`extractFinalScore`), пишет `finalScore` + `status = 'finished'`, эмитит `match.score_parsed` и публикует `StateService.finalScoreParsed()`.
 - `NbBetParserDetailService.checkPendingBet()` — `@Cron('0 */2 * * * *')`: раз в 2 минуты берёт один матч из `findOneWithPendingBet()` и вызывает `parseMatchScore()`. Флаг `pendingBetRunning` не даёт тикам наложиться. Цепочка: `match.score_parsed` → `MatchesAnalyzerService.analyzeOneScore()` → `betStatus` + `match_bet_checked`.
+- `helpers/extract-match-resolution.ts` — `extractMatchResolution(doc)` возвращает `'postponed' | 'canceled' | null` по прямому тексту «Перенесён»/«Перенесен»/«Отменён» (и английским вариантам) в карточке матча. Счёт таких матчей (`0:0`) не считается финальным.
 - Хелперы должны оставаться «чистыми»: принимают `Document` и возвращают типизированные данные, без побочных эффектов.
 
 Селекторы `nb-bet.com` хрупкие. При изменении вёрстки:

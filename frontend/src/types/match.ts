@@ -4,9 +4,11 @@
  * Статус матча (ответ от API).
  * - `scheduled` — матч ещё не начался;
  * - `live` — матч идёт прямо сейчас;
- * - `finished` — матч завершён.
+ * - `finished` — матч завершён;
+ * - `postponed` — матч перенесён;
+ * - `canceled` — матч отменён.
  */
-export type MatchStatus = 'scheduled' | 'live' | 'finished';
+export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'canceled';
 
 /**
  * Основная сущность матча (ответ от API)

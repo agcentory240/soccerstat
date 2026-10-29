@@ -32,8 +32,11 @@ export class NbBetParserMainController {
     }
 
     @Get('checkbets')
-    async checkBets(): Promise<void> {
-        await this.parserDetailService.parseMatchesScore();
+    async checkBets(): Promise<{ ok: boolean; checked: number }> {
+        const checked = await this.parserDetailService.parseMatchesScore();
+        // Возвращаем тело ответа: без него клиент получает пустой 200
+        // и падает на `res.json()` с «Unexpected end of JSON input».
+        return { ok: true, checked };
     }
 
     @Get('checkbet/:id')

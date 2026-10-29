@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { MatchEntity } from './match.entity.js';
 import type { Match } from '../nb-bet-parser-main/match.interface.js';
 
@@ -20,6 +20,7 @@ export class MatchesService {
     if (matches.length === 0) return 0;
 
     const entities = matches.map((m) => this.toEntity(m));
+    await this.keepResolutionStatuses(entities);
 
     await this.repo
       .createQueryBuilder()
@@ -124,6 +125,7 @@ export class MatchesService {
       | 'selected'
       | 'marked'
       | 'finalScore'
+      | 'status'
       | 'ready'
     >>,
   ): Promise<boolean> {
@@ -179,16 +181,18 @@ export class MatchesService {
   }
 
   /**
-   * Матчи, которые нужно проверить на счёт после завершения.
+   * Матчи, которые нужно проверить на счёт после расчётного времени окончания.
    *
    * Условия:
    * - `marked` — матч отмечен пользователем;
    * - `selected` — матч отобран для глубокого анализа;
    * - `betStatus IS NULL` — результат ставки ещё не выяснен
    *   (`false` означает «проверено и не сыграла», поэтому не попадает);
-   * - `dateTime + 90 минут < NOW()` — расчётное время окончания матча уже прошло,
-   *   поэтому счёт можно считать финальным (status не проверяем: у «залипших»
-   *   live-матчей он может остаться прежним).
+   * - `dateTime + 90 минут < NOW()` — расчётное время окончания матча уже прошло;
+   * - `status IN ('scheduled', 'live', 'finished')` — матч ещё может получить счёт.
+   *   Перенесённые (`postponed`) и отменённые (`canceled`) матчи исключаются:
+   *   счёта у них не будет, и без этого фильтра они бесконечно попадали бы
+   *   в повторный парсинг.
    *
    * Сортировка — по времени начала матча по убыванию (сначала свежие).
    */
@@ -197,8 +201,10 @@ export class MatchesService {
       .createQueryBuilder('m')
       .where('m."marked" = true')
       .andWhere('m."selected" = true')
+      .andWhere('m."deepAnalyzed" = true')
       .andWhere('m."betStatus" IS NULL')
       .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
+      .andWhere(`m."status" IN ('scheduled', 'live', 'finished')`)
       .orderBy('m."dateTime"', 'DESC')
       .getMany();
   }
@@ -213,7 +219,9 @@ export class MatchesService {
    * - `selected = true` — матч отобран для глубокого анализа;
    * - `dateTime + 90 минут < NOW()` — расчётное время окончания матча уже прошло,
    *   поэтому счёт можно считать финальным (status не проверяем: у «залипших»
-   *   live-матчей он может остаться прежним).
+   *   live-матчей он может остаться прежним);
+   * - `status NOT IN ('postponed', 'canceled')` — перенесённые и отменённые
+   *   матчи счёта не получат, поэтому не должны занимать очередь проверки.
    *
    * Используется периодической задачей (раз в 2 минуты), которая заново
    * парсит счёт такого матча и тем самым запускает проверку ставки.
@@ -225,8 +233,49 @@ export class MatchesService {
       .andWhere('m."betStatus" IS NULL')
       .andWhere('m."selected" = true')
       .andWhere(`m."dateTime" + INTERVAL '90 minutes' < NOW()`)
+      .andWhere(`m."status" NOT IN ('postponed', 'canceled')`)
       .orderBy('m."dateTime"', 'ASC')
       .getOne();
+  }
+
+  /**
+   * Не даёт списку матчей перетереть статусы `postponed` / `canceled`,
+   * выставленные проверкой детальной страницы.
+   *
+   * Список nb-bet может снова отдавать такой матч как обычный
+   * `scheduled`/`finished`, и тогда матч вернулся бы в очередь повторного
+   * парсинга счёта. Исключение — перенесённый матч, у которого изменилась
+   * дата: он снова актуален и получает статус из списка.
+   */
+  private async keepResolutionStatuses(entities: Partial<MatchEntity>[]): Promise<void> {
+    const urls = entities
+      .map((e) => e.url)
+      .filter((url): url is string => typeof url === 'string');
+
+    if (urls.length === 0) return;
+
+    const frozen = await this.repo.find({
+      select: { url: true, status: true, dateTime: true },
+      where: {
+        url: In(urls),
+        status: In<MatchEntity['status']>(['postponed', 'canceled']),
+      },
+    });
+
+    if (frozen.length === 0) return;
+
+    const frozenByUrl = new Map(frozen.map((f) => [f.url, f]));
+
+    for (const entity of entities) {
+      const prev = entity.url ? frozenByUrl.get(entity.url) : undefined;
+      if (!prev) continue;
+
+      const dateChanged = prev.dateTime.getTime() !== entity.dateTime?.getTime();
+
+      if (prev.status === 'canceled' || (prev.status === 'postponed' && !dateChanged)) {
+        entity.status = prev.status;
+      }
+    }
   }
 
   private toEntity(m: Match): Partial<MatchEntity> {

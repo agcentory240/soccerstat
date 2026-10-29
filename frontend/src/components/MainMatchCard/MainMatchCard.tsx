@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { Match } from '../../types/match';
+import type { Match, MatchStatus } from '../../types/match';
 import { formatMatchDateTime } from '../../utils/dateTime';
 import { formatConfidence } from '../../utils/format';
 
@@ -7,19 +7,37 @@ interface MatchCardProps {
   match: Match;
 }
 
+/** Подписи и оформление бейджа статуса матча. */
+const STATUS_BADGES: Record<MatchStatus, { label: string; className: string }> = {
+  scheduled: { label: 'Не начался', className: 'bg-slate-700 text-slate-300' },
+  live: { label: 'Live', className: 'bg-red-600 text-white' },
+  finished: { label: 'Завершён', className: 'bg-slate-700 text-slate-300' },
+  postponed: { label: 'Перенесён', className: 'bg-slate-600 text-slate-200' },
+  canceled: { label: 'Отменён', className: 'bg-slate-600 text-slate-200' },
+};
+
 export function MainMatchCard({ match }: MatchCardProps) {
   /**
-   * Тон карточки по статусу ставки:
-   * - `null` — событие в ожидании, нейтральное оформление;
-   * - `true` — ставка зашла, зеленоватые рамка и фон;
-   * - `false` — ставка не зашла, красноватые рамка и фон.
+   * Перенесённый или отменённый матч показываем серым: результат не будет
+   * получен, поэтому его не нужно выделять цветом ставки.
    */
-  const cardToneClass =
-    match.betStatus === null
+  const isVoided = match.status === 'canceled' || match.status === 'postponed';
+
+  /**
+   * Тон карточки:
+   * - `postponed` / `canceled` — серая приглушённая карточка;
+   * - иначе по статусу ставки: `null` — нейтрально, `true` — зелёная,
+   *   `false` — красная.
+   */
+  const cardToneClass = isVoided
+    ? 'border-slate-700 bg-slate-800/40 opacity-60 grayscale'
+    : match.betStatus === null
       ? 'border-slate-800 bg-slate-900'
       : match.betStatus
         ? 'border-green-700/70 bg-green-950/40'
         : 'border-red-700/70 bg-red-950/40';
+
+  const statusBadge = STATUS_BADGES[match.status] ?? STATUS_BADGES.scheduled;
 
   /**
    * Уверенность модели в процентах — тот же расчёт, что в карточке списка
@@ -45,8 +63,15 @@ export function MainMatchCard({ match }: MatchCardProps) {
         className="absolute inset-0 rounded-lg"
       />
 
-      {/* Страна · лига */}
-      <div className="h-7 w-2/3 text-xs">{match.country} · {match.league} </div>
+      {/* Страна · лига и статус матча */}
+      <div className="flex h-7 items-center gap-2 text-xs">
+        <span className="truncate">{match.country} · {match.league}</span>
+        <span
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${statusBadge.className}`}
+        >
+          {statusBadge.label}
+        </span>
+      </div>
 
       {/* Время начала */}
       <div className="h-2 text-xs">{formatMatchDateTime(match.dateTime, { withYear: false })}</div>

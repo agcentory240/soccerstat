@@ -93,8 +93,9 @@ function findPeriodsScore(container: Element): string | null {
 
 /**
  * Извлекает только прямой текст элемента (без детей).
+ * Экспортируется для переиспользования другими экстракторами.
  */
-function extractDirectText(el: Element): string {
+export function extractDirectText(el: Element): string {
   const parts: string[] = []
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeName === '#text') {

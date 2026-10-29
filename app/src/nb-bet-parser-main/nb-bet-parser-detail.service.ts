@@ -27,6 +27,7 @@ import { extractTeamTrends } from './helpers/extract-team-trends.js';
 import { extractTeamSeries } from './helpers/extract-team-series.js';
 import { MatchEntity } from '../matches/match.entity.js';
 import { extractFinalScore } from './helpers/extract-final-score.js';
+import { extractMatchResolution } from './helpers/extract-match-resolution.js';
 
 
 chromium.use(StealthPlugin());
@@ -50,13 +51,21 @@ export class NbBetParserDetailService {
   ) { }
 
 
-  async parseMatchesScore(): Promise<void> {
+  /**
+   * Проверяет счёт всех матчей из очереди `findSelectedWithPredictionFinished()`.
+   *
+   * @returns количество матчей, у которых счёт/статус был перепроверен
+   */
+  async parseMatchesScore(): Promise<number> {
     const matchesToCheck = await this.matchesService.findSelectedWithPredictionFinished();
 
     // Парсим счета последовательно: каждый матч открывает свой браузер
     for (const match of matchesToCheck) {
       await this.parseMatchScore(match);
     }
+
+    this.logger.log(`Проверено матчей: ${matchesToCheck.length}`);
+    return matchesToCheck.length;
   }
 
   /**
@@ -124,14 +133,27 @@ export class NbBetParserDetailService {
         });
 
       await page.waitForTimeout(3000);
-      let html = await page.content();   
+      let html = await page.content();
       let dom = new JSDOM(html);
-      
+
+      // 1. Сначала проверяем перенос/отмену: у таких матчей на странице
+      //    обычно стоит счёт `0:0`, который нельзя считать финальным.
+      const resolution = extractMatchResolution(dom.window.document);
+      if (resolution) {
+        await this.matchesService.updateFields(match.id, { status: resolution });
+        this.logger.warn(
+          `[${match.id}] Матч ${resolution === 'postponed' ? 'перенесён' : 'отменён'} — счёт не проверяется`,
+        );
+        return;
+      }
+
+      // 2. Счёт найден — матч завершён, фиксируем счёт и статус.
       const score = extractFinalScore(dom.window.document);
       if (score) {
         const finalScore = `${score.total} ${score.byPeriods}`;
         await this.matchesService.updateFields(match.id, {
           finalScore: finalScore,
+          status: 'finished',
         });
 
         // Событие `match_parsed`: в RabbitMQ (запуск глубокого анализа) и Redis/SSE
@@ -144,7 +166,7 @@ export class NbBetParserDetailService {
           league: match.league,
           url: match.url,
         };
-        await this.stateService.finalScoreParsed( matchInfo,finalScore );        
+        await this.stateService.finalScoreParsed( matchInfo,finalScore );
 
       } else {
         this.logger.warn(`[${match.id}] Cчёт завершенного матча не найден`);

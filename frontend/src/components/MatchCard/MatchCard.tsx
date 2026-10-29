@@ -48,7 +48,7 @@ export function MatchCard({ match,active }: MatchCardProps) {
 
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
           <span>{formatMatchDateTime(match.dateTime, { withYear: false })}</span>
-          {match.liveTime && match.status !== 'finished' && (
+          {match.liveTime && match.status === 'live' && (
             <span className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold">
               {match.liveTime}
             </span>
@@ -56,6 +56,16 @@ export function MatchCard({ match,active }: MatchCardProps) {
           {match.status === 'finished' && (
             <span className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[10px] font-bold">
               Завершён
+            </span>
+          )}
+          {match.status === 'postponed' && (
+            <span className="px-1.5 py-0.5 bg-amber-600 text-white rounded text-[10px] font-bold">
+              Перенесён
+            </span>
+          )}
+          {match.status === 'canceled' && (
+            <span className="px-1.5 py-0.5 bg-rose-700 text-white rounded text-[10px] font-bold">
+              Отменён
             </span>
           )}
         </div>

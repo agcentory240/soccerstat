@@ -8,9 +8,15 @@ export interface MatchOdds {
  * Статус матча по данным nb-bet.
  * - `scheduled` — матч ещё не начался (тип `1` в исходных данных);
  * - `live` — матч идёт прямо сейчас (тип `2`);
- * - `finished` — матч завершён (тип `3`).
+ * - `finished` — матч завершён (тип `3`);
+ * - `postponed` — матч перенесён (определяется по тексту детальной страницы);
+ * - `canceled` — матч отменён (определяется по тексту детальной страницы).
+ *
+ * `postponed` и `canceled` не приходят из списка nb-bet: они выставляются
+ * при проверке детальной страницы матча и исключают матч из очередей
+ * повторного парсинга счёта.
  */
-export type MatchStatus = 'scheduled' | 'live' | 'finished';
+export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed' | 'canceled';
 
 export interface Match {
   country: string;

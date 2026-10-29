@@ -56,9 +56,25 @@ export async function parseMatchScore(id: string | number) {
   return res.json()
 }
 
-/** Запускает массовую проверку ставок по завершённым матчам (`/parser/checkbets`). */
-export async function checkBets() {
+/** Ответ сервера на массовую проверку ставок. */
+export interface CheckBetsResult {
+  ok: boolean;
+  /** Сколько матчей было перепроверено. */
+  checked: number;
+}
+
+/**
+ * Запускает массовую проверку ставок по завершённым матчам (`/parser/checkbets`).
+ *
+ * Ответ читается как текст: сервер может вернуть пустое тело (200/204),
+ * и тогда `res.json()` упал бы с «Unexpected end of JSON input».
+ */
+export async function checkBets(): Promise<CheckBetsResult | null> {
   const res = await fetch(`${API_URL}/parser/checkbets`)
   if (!res.ok) throw new Error('Ошибка проверки ставок')
-  return res.json()
+
+  const body = await res.text()
+  if (!body) return null
+
+  return JSON.parse(body) as CheckBetsResult
 }
