@@ -6,12 +6,12 @@ export function TopPage() {
   const prognozedMatchesTop = useMatchesStore((s) => s.prognozedMatchesTop);
   const loading = useMatchesStore((s) => s.loading);
   const error = useMatchesStore((s) => s.error);
-  const loadPrognozeMatches = useMatchesStore((s) => s.loadPrognozeMatches);
+  const loadPrognozeMatchesTop = useMatchesStore((s) => s.loadPrognozeMatchesTop);
 
   // Список нужен для группировки по игровым дням; SSE-подписка живёт в Layout.
   useEffect(() => {
-    void loadPrognozeMatches();
-  }, [loadPrognozeMatches]);
+    void loadPrognozeMatchesTop();
+  }, [loadPrognozeMatchesTop]);
 
   return (
     <div className="flex h-full">

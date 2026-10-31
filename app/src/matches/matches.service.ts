@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { MatchEntity } from './match.entity.js';
 import type { Match } from '../nb-bet-parser-main/match.interface.js';
 
@@ -70,21 +70,37 @@ export class MatchesService {
    * - `deepAnalyzed` — глубокий анализ выполнен;
    * - `mainBet IS NOT NULL` и `deepAnalysis IS NOT NULL` — прогноз содержит
    *   конкретную ставку и полный JSON-ответ (отсекает ветку «недостаточно данных»);
-   * - `finalDecision = 'СТАВИТЬ'` — вердикт модели допускает ставку.
+   * - `finalDecision = 'СТАВИТЬ'` — вердикт модели допускает ставку;
+   * - `betCoefficient > min` — коэффициент основной ставки выше порога.
    *
    * Статус матча не важен: попадают и завершённые, и live, и предстоящие.
+   *
+   * @param min - минимальный коэффициент ставки (включительно не включается:
+   *   сравнение строгое `>`). Некорректное значение (NaN/Infinity)
+   *   трактуется как `0`, чтобы запрос не падал и возвращал весь список.
    */
-  async findPrognozedScored(): Promise<MatchEntity[]> {
-    return this.repo.find({
-      where: {
-        selected: true,
-        deepAnalyzed: true,
-        finalDecision: 'СТАВИТЬ',
-        mainBet: Not(IsNull()),
-        deepAnalysis: Not(IsNull()),
-      },
-      order: { aiScore: 'DESC', dateTime: 'ASC' },
-    });
+  async findPrognozedScored(min: number): Promise<MatchEntity[]> {
+    /**
+     * `betCoefficient` в БД — `decimal` (`numeric`), но TypeORM отдаёт его
+     * строкой, поэтому сравнение с числом делаем внутри SQL: PostgreSQL
+     * приводит `numeric` к числовому типу параметра сам, без приведения
+     * строки в JS. `NULL` отсекается отдельно — иначе матчи без ставки
+     * потерялись бы по трёхзначной логике SQL.
+     */
+    const threshold = Number.isFinite(min) ? min : 0;
+
+    return this.repo
+      .createQueryBuilder('m')
+      .where('m.selected = :selected', { selected: true })
+      .andWhere('m.deepAnalyzed = :deepAnalyzed', { deepAnalyzed: true })
+      .andWhere('m.finalDecision = :decision', { decision: 'СТАВИТЬ' })
+      .andWhere('m.mainBet IS NOT NULL')
+      .andWhere('m.deepAnalysis IS NOT NULL')
+      .andWhere('m."betCoefficient" IS NOT NULL')
+      .andWhere('m."betCoefficient" > :min', { min: threshold })
+      .orderBy('m.aiScore', 'DESC')
+      .addOrderBy('m.dateTime', 'ASC')
+      .getMany();
   }
 
 

@@ -35,8 +35,9 @@ frontend/src/
 
 `useMatchesStore`:
 
-- `matches`, `prognozedMatches`, `loading`, `refreshing`, `error`;
-- `updateMatch(match)` — точечно заменяет матч по `id` сразу в `matches` и `prognozedMatches`; списки, где матча нет, сохраняют ссылку и не вызывают лишних рендеров;
+- `matches`, `prognozedMatches`, `prognozedMatchesTop`, `loading`, `refreshing`, `checkingBets`, `error`;
+- `loadPrognozeMatches()` — `GET /matches/prognozed` в `prognozedMatches`; `loadPrognozeMatchesTop()` — тот же эндпоинт с `min=1.75` в `prognozedMatchesTop` (используется страницей `/top`);
+- `updateMatch(match)` — точечно заменяет матч по `id` сразу в `matches`, `prognozedMatches` и `prognozedMatchesTop`; списки, где матча нет, сохраняют ссылку и не вызывают лишних рендеров;
 - `serverState`, `eventsConnected` — состояние сервера из SSE и статус соединения;
 - `eventLogs` — журнал событий Redis (`ServerStateLogEntry[]`, кольцевой буфер на 300 записей), пополняется при каждом SSE-событии;
 - `loadMatches()` — `GET /matches`, сортировка (selected сверху, затем по дате), лимит 500;

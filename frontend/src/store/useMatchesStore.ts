@@ -21,9 +21,10 @@ const MAX_EVENT_LOGS = 300
 let logSeq = 0
 
 interface MatchesState {
-  [x: string]: any
   matches: Match[]
   prognozedMatches: Match[]
+  /** Прогнозы с коэффициентом выше порога (`/matches/prognozed?min=1.75`). */
+  prognozedMatchesTop: Match[]
   loading: boolean
   refreshing: boolean   // ← отдельный флаг для "Обновить матчи"
   checkingBets: boolean // ← отдельный флаг для "Проверить ставки"
@@ -43,7 +44,8 @@ interface MatchesState {
   clearEventLogs: () => void
   /**
    * Точечно заменяет матч во всех загруженных списках (`matches`,
-   * `prognozedMatches`). Списки, где матча нет, не меняются.
+   * `prognozedMatches`, `prognozedMatchesTop`). Списки, где матча нет,
+   * не меняются.
    */
   updateMatch: (match: Match) => void
 }
@@ -51,6 +53,7 @@ interface MatchesState {
 export const useMatchesStore = create<MatchesState>((set, get) => ({
   matches: [],
   prognozedMatches: [],
+  prognozedMatchesTop: [],
   loading: false,
   refreshing: false,
   checkingBets: false,
@@ -77,7 +80,7 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const data = await fetchPrognozedMatchesTop()
-      set({ prognozedMatches: sortMatches(data).slice(0, 500) })
+      set({ prognozedMatchesTop: sortMatches(data).slice(0, 500) })
     } catch (e: unknown) {
       set({ error: getErrorMessage(e) })
     } finally {
@@ -139,6 +142,7 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
       ...prev,
       matches: replaceById(prev.matches, match),
       prognozedMatches: replaceById(prev.prognozedMatches, match),
+      prognozedMatchesTop: replaceById(prev.prognozedMatchesTop, match),
     }))
   },
 

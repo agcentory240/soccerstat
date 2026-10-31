@@ -23,8 +23,8 @@ export class MatchesController {
     return this.matchesService.findByDate(date);
   }
   @Get('prognozed')
-  async findPrognozed() {
-    return this.matchesService.findPrognozedScored();
+  async findPrognozed(@Query('min') min: string = "0") {
+    return this.matchesService.findPrognozedScored(Number(min));
   }
 
   @Post('analyze')
