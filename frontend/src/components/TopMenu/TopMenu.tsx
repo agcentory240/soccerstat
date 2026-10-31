@@ -5,6 +5,7 @@ import type { ServerStateEvent } from '../../types/state';
 
 const INTERNAL_ITEMS = [
   { label: 'Главная', to: '/' },
+  { label: 'TOP', to: '/top' },
   { label: 'Прогнозы', to: '/prognoses' },
   { label: 'Live', to: '/live' },  // когда добавишь
 ];

@@ -4,6 +4,7 @@ import { MatchesPage } from './pages/MatchesPage/MatchesPage';
 import { MatchDetails } from './components/MatchDetails/MatchDetails';
 import { MatchDetailsPlaceholder } from './components/MatchDetails/MatchDetailsPlaceholder';
 import { MainPage } from './pages/MainPage';
+import { TopPage } from './pages/TopPage/TopPage';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<MainPage/>} />
+          <Route path="/top" element={<TopPage/>} />
           <Route path="/prognoses" element={<MatchesPage />}>
             <Route index element={<MatchDetailsPlaceholder />} />
             <Route path=":id" element={<MatchDetails />} />

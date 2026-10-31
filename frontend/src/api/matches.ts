@@ -18,6 +18,14 @@ export async function fetchPrognozedMatches(): Promise<Match[]> {
   return res.json();
 }
 
+export async function fetchPrognozedMatchesTop(): Promise<Match[]> {
+  const res = await fetch(`${API_URL}/matches/prognozed?min=1.75`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch matches: ${res.status}`);
+  }
+  return res.json();
+}
+
 /** Загружает один матч по id (используется для точечного обновления карточки). */
 export async function fetchMatch(id: number): Promise<Match> {
   const res = await fetch(`${API_URL}/matches/${id}`);

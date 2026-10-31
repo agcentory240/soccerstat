@@ -3,6 +3,7 @@ import {
   checkBets as checkBetsRequest,
   fetchMatches,
   fetchPrognozedMatches,
+  fetchPrognozedMatchesTop,
   parseMatches,
 } from '../api/matches'
 import { subscribeToServerState } from '../api/events'
@@ -20,6 +21,7 @@ const MAX_EVENT_LOGS = 300
 let logSeq = 0
 
 interface MatchesState {
+  [x: string]: any
   matches: Match[]
   prognozedMatches: Match[]
   loading: boolean
@@ -33,6 +35,7 @@ interface MatchesState {
 
   loadMatches: () => Promise<void>
   loadPrognozeMatches: () => Promise<void>
+  loadPrognozeMatchesTop: () => Promise<void>
   refreshAll: () => Promise<void>   // ← парсинг + анализ + перезагрузка
   checkBets: () => Promise<void>    // ← массовая проверка ставок по завершённым матчам
   connectEvents: () => () => void   // ← подписка на состояние сервера
@@ -69,6 +72,18 @@ export const useMatchesStore = create<MatchesState>((set, get) => ({
     }
   },
 
+  loadPrognozeMatchesTop: async () => {
+    if (get().loading) return
+    set({ loading: true, error: null })
+    try {
+      const data = await fetchPrognozedMatchesTop()
+      set({ prognozedMatches: sortMatches(data).slice(0, 500) })
+    } catch (e: unknown) {
+      set({ error: getErrorMessage(e) })
+    } finally {
+      set({ loading: false })
+    }
+  },
   loadPrognozeMatches: async () => {
     if (get().loading) return
     set({ loading: true, error: null })
