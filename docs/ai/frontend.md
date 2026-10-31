@@ -24,6 +24,7 @@ frontend/src/
 `App.tsx`:
 
 - `/` → `MainPage`: список матчей [`MainMatchList`](frontend/src/components/MainMatchList/MainMatchList.tsx), сгруппированный по игровым дням. Между днями выводится [`MatchDayDivider`](frontend/src/components/MatchDayDivider/MatchDayDivider.tsx) с датой дня, карточки [`MainMatchCard`](frontend/src/components/MainMatchCard/MainMatchCard.tsx) — по 5 в ряд (`grid-cols-5`), показывают `finalScore` и `betStatus`. Данные берутся из `prognozedMatches` стора. Как и `MatchList`, компонент слушает стадии `score-parsed` / `bet-checked` и точечно обновляет одну карточку через `fetchMatch()` + `updateMatch()`;
+  - сводка по ставкам (`won`, `lost`, `skipped`, `pending`) пересчитывается в `useEffect` при каждом изменении пропа `matches` и выводится двумя уровнями: общей строкой «Итого по всем дням» над списком и строкой «За день» под каждым [`MatchDayDivider`](frontend/src/components/MatchDayDivider/MatchDayDivider.tsx). Состояние — `MatchStatsSummary` (`total` + `byDay`, ключ дня `dateTime.slice(0, 10)`). Категории взаимоисключающие: `skipped` — нет `mainBet` либо матч `canceled`/`postponed`; `pending` — `betStatus === null`; иначе `won` / `lost` по `betStatus`;
 - `/prognoses` → `MatchesPage` со списком;
 - `/prognoses/:id` → `MatchDetails` внутри `Outlet`;
 - без `id` показывается `MatchDetailsPlaceholder`.
