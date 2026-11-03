@@ -18,6 +18,7 @@ import { StateService } from '../state/state.service.js';
 import type { ServerStateMatchInfo } from '../state/state.types.js';
 import type { BetCheckResult } from './bet-check.interface.js';
 import { parseFinalScore, formatScorePair } from '../nb-bet-parser-main/helpers/parse-final-score.js';
+import { PostProcessorService } from '../analysis/post-processor.service.js';
 
 @Injectable()
 export class MatchesAnalyzerService {
@@ -34,6 +35,7 @@ export class MatchesAnalyzerService {
   constructor(
     @InjectRepository(MatchEntity)
     private readonly repo: Repository<MatchEntity>,
+    private readonly postProcessor: PostProcessorService,
     private readonly aiService: AiService,
     @Inject('MATCHES_SERVICE') private readonly client: ClientProxy,
     private readonly stateService: StateService,
@@ -521,7 +523,7 @@ ID матча: ${matchId}.
   }
 
   /**
-   * Сохранение глубокого анализа в БД
+   * Сохранение глубокого анализа в БД (с постобработкой).
    */
   private async saveDeepAnalysis(
     match: MatchEntity,
@@ -529,31 +531,36 @@ ID матча: ${matchId}.
     manual: boolean = false,
   ): Promise<void> {
     const pred = result.prediction || ({} as any);
+
+    // 🆕 Постобработка
+    const post = this.postProcessor.process(result);
+
     const confidence = pred.confidence ?? null;
     const ev = this.parseExpectedValue(pred.expected_value);
 
     await this.repo.update(match.id, {
-      // Флаг
       deepAnalyzed: true,
       deepAnalyzedAt: new Date(),
 
-      // Основное решение
-      finalDecision: result.final_decision || null,
-      mainBet: pred.main_bet || null,
-      betCoefficient: pred.coefficient != null ? String(pred.coefficient) : null,
+      // Решение — из постпроцессора
+      finalDecision: post.finalDecision,
+      mainBet: post.mainBet,
+      betCoefficient:
+        pred.coefficient != null ? String(pred.coefficient) : null,
       confidence: confidence != null ? String(confidence) : null,
       expectedValue: ev != null ? String(ev) : null,
       stakeRecommendation: pred.stake_recommendation || null,
 
       // Тексты
-      deepReasoning: result.reasoning || null,
+      deepReasoning: post.reasoning,
       summary: result.summary || null,
 
-      // Полный JSON
+      // Полный JSON — исходный ответ модели (для аудита)
       deepAnalysis: result as any,
     });
+
     if (manual) {
-      await this.repo.update(match.id, { selected: true, marked: true});
+      await this.repo.update(match.id, { selected: true, marked: true });
     }
   }
 

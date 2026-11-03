@@ -7,6 +7,7 @@ import { AiModule } from '../ai/ai.module.js';
 import { MatchesAnalyzerService } from './matches-analyzer.service.js';
 import { RabbitmqModule } from '../rabbitmq/rabbitmq.module.js';
 import { StateModule } from '../state/state.module.js';
+import { PostProcessorService } from '../analysis/post-processor.service.js';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { StateModule } from '../state/state.module.js';
     RabbitmqModule,
     StateModule,
   ],
-  providers: [MatchesService,MatchesAnalyzerService],
+  providers: [MatchesService,MatchesAnalyzerService, PostProcessorService],
   controllers: [MatchesController],
   exports: [MatchesService,MatchesAnalyzerService],
 })

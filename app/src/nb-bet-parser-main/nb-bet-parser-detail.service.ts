@@ -169,7 +169,7 @@ export class NbBetParserDetailService {
         await this.stateService.finalScoreParsed( matchInfo,finalScore );
 
       } else {
-        this.logger.warn(`[${match.id}] Cчёт завершенного матча не найден`);
+        this.logger.warn(`[${match.id} ${match.homeTeam} - ${match.awayTeam} ${match.url}]  Cчёт завершенного матча не найден`);
       }
 
       } finally {
